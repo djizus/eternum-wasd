@@ -246,7 +246,7 @@ const Dashboard = () => {
         try {
             const errorData = await updateResponse.json();
             errorMsg = errorData.error || errorMsg;
-        } catch (e) { /* ignore json parsing error */ }
+        } catch (_e) { /* ignore json parsing error */ }
         throw new Error(errorMsg);
       }
 

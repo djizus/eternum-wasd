@@ -16,8 +16,11 @@ A Next.js-based web application for managing and tracking members and realms. Th
 src/
 ├── app/              # Next.js app directory (routing and layouts)
 ├── components/       # React components
+│   ├── Dashboard.css
 │   ├── Dashboard.tsx
+│   ├── Header.css
 │   ├── Header.tsx
+│   ├── MembersPage.css
 │   └── MembersPage.tsx
 ├── services/         # Backend services and API integrations
 │   └── realms.ts

@@ -14,6 +14,7 @@ const MembersPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [fetchingAddress, setFetchingAddress] = useState(false);
 
   const fetchMembers = async () => {
     setLoading(true);
@@ -55,6 +56,38 @@ const MembersPage: React.FC = () => {
       setError('Failed to add member');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFetchAddressFromUsername = async () => {
+    if (!username) {
+      setError('Please enter a username to fetch the address.');
+      return;
+    }
+    setFetchingAddress(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/cartridge-address?username=${encodeURIComponent(username)}`);
+      
+      const result = await response.json();
+
+      if (response.ok && result.address) {
+        setAddress(result.address);
+      } else {
+        setError(result.error || 'Failed to fetch address. Please try again.');
+        setAddress('');
+        console.error("Fetch address error from backend:", result);
+      }
+    } catch (err: unknown) {
+      console.error("Fetch address client-side/network error (calling own backend):", err);
+      let errorMessage = 'Network error connecting to backend.';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      setError(`Failed to fetch address: ${errorMessage}`);
+      setAddress('');
+    } finally {
+      setFetchingAddress(false);
     }
   };
 
@@ -107,18 +140,26 @@ const MembersPage: React.FC = () => {
           <div className="form-group">
             <input
               type="text"
-              placeholder="Address"
-              value={address}
-              onChange={e => setAddress(e.target.value)}
-              className="form-input"
-            />
-          </div>
-          <div className="form-group">
-            <input
-              type="text"
               placeholder="Username"
               value={username}
               onChange={e => setUsername(e.target.value)}
+              className="form-input"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleFetchAddressFromUsername}
+            className="add-button fetch-address-button"
+            disabled={fetchingAddress || !username}
+          >
+            {fetchingAddress ? 'Fetching...' : 'Fetch Address'}
+          </button>
+          <div className="form-group">
+            <input
+              type="text"
+              placeholder="Address"
+              value={address}
+              onChange={e => setAddress(e.target.value)}
               className="form-input"
             />
           </div>
