@@ -67,13 +67,15 @@ const troopTierMap: Record<string, 'T1' | 'T2' | 'T3'> = {
 };
 
 interface Member {
+  _id?: string; // Assuming _id might exist from DB
   address?: string;
-  // Add other fields if needed, like username, but address is key for filtering
+  username?: string; // Ensure username is part of the Member interface
 }
 
 const Dashboard = () => {
   const [realms, setRealms] = useState<Realm[]>([]);
-  const [guildMembers, setGuildMembers] = useState<Set<string>>(new Set()); // Store member addresses (lowercase) in a Set for efficient lookup
+  // Store full member details instead of just addresses
+  const [guildMembersDetails, setGuildMembersDetails] = useState<Member[]>([]); 
   const [loading, setLoading] = useState(true);
   const [loadingMembers, setLoadingMembers] = useState(true); // Separate loading state for members
   const [searchTerm, setSearchTerm] = useState('');
@@ -83,33 +85,27 @@ const Dashboard = () => {
   const [sortBy, setSortBy] = useState<'name' | 'id'>('id');
   const [isProcessingFilters, setIsProcessingFilters] = useState(false);
   const [isRefreshingOwners, setIsRefreshingOwners] = useState(false);
-  const [filterByGuildMembers, setFilterByGuildMembers] = useState<boolean>(false); // New filter state
+  const [filterByGuildMembers, setFilterByGuildMembers] = useState<boolean>(true);
 
   useEffect(() => {
     const fetchInitialData = async () => {
       setLoading(true);
       setLoadingMembers(true);
       try {
-        // Fetch realms and members in parallel
         const [loadedRealms, memberResponse] = await Promise.all([
           loadRealms(),
-          fetch('/api/members') // Fetch member data
+          fetch('/api/members')
         ]);
         
         setRealms(loadedRealms);
 
-        // Process members data
         if (memberResponse.ok) {
           const membersData: Member[] = await memberResponse.json();
-          const memberAddresses = new Set(membersData
-            .map(member => member.address?.toLowerCase()) // Get lowercase address
-            .filter((address): address is string => !!address) // Filter out undefined/null addresses
-          );
-          setGuildMembers(memberAddresses);
-          console.log(`Loaded ${memberAddresses.size} guild member addresses.`);
+          setGuildMembersDetails(membersData); // Store full member details
+          console.log(`Loaded ${membersData.length} guild member details.`);
         } else {
           console.error('Failed to fetch guild members:', memberResponse.statusText);
-          // Optionally set an error state here
+          setGuildMembersDetails([]); // Set empty on error
         }
 
       } catch (error) {
@@ -120,17 +116,55 @@ const Dashboard = () => {
       }
     };
     fetchInitialData();
-  }, []); // Empty dependency array means this runs once on mount
+  }, []);
 
-  const uniqueOwners = useMemo(() => {
-    const owners = new Set<string>();
-    realms.forEach(realm => {
-      if (realm.owner) {
-        owners.add(realm.owner);
+  // Create a memoized map from lowercase address to username
+  const memberAddressToUsernameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    guildMembersDetails.forEach(member => {
+      if (member.address && member.username) {
+        map.set(member.address.toLowerCase(), member.username);
       }
     });
-    return Array.from(owners);
-  }, [realms]);
+    return map;
+  }, [guildMembersDetails]);
+
+  // Use this map for the guild member filter check as well (more efficient)
+  const guildMemberAddresses = useMemo(() => {
+    return new Set(memberAddressToUsernameMap.keys());
+  }, [memberAddressToUsernameMap]);
+
+  // Modify uniqueOwners to create a list of { value: string, label: string } objects
+  // and sort them with guild members (by username) first.
+  const uniqueOwnersForFilter = useMemo(() => {
+    const ownersSet = new Set<string>();
+    realms.forEach(realm => {
+      if (realm.owner) {
+        ownersSet.add(realm.owner);
+      }
+    });
+
+    return Array.from(ownersSet)
+      .map(ownerAddress => {
+        const lowerOwnerAddress = ownerAddress.toLowerCase();
+        const username = memberAddressToUsernameMap.get(lowerOwnerAddress);
+        const isGuildMember = !!username;
+        return {
+          value: ownerAddress,
+          label: username || `${ownerAddress.substring(0, 6)}...${ownerAddress.substring(ownerAddress.length - 4)}`,
+          isGuildMember: isGuildMember,
+          // Use username for sorting guild members, address for others
+          sortKey: (isGuildMember ? username : ownerAddress).toLowerCase(), 
+        };
+      })
+      .sort((a, b) => {
+        // Sort guild members to the top
+        if (a.isGuildMember && !b.isGuildMember) return -1;
+        if (!a.isGuildMember && b.isGuildMember) return 1;
+        // Then sort by username (for members) or address (for non-members)
+        return a.sortKey.localeCompare(b.sortKey);
+      });
+  }, [realms, memberAddressToUsernameMap]);
 
   const filteredRealms = useMemo(() => {
     return realms.filter(realm => {
@@ -143,7 +177,7 @@ const Dashboard = () => {
       const matchesResource = !selectedResource || realm.resources.some(r => r.resource === selectedResource);
       const matchesTroop = !selectedTroop || realm.availableTroops.includes(selectedTroop);
       const matchesOwner = !selectedOwnerFilter || owner === selectedOwnerFilter;
-      const matchesGuildMembers = filterByGuildMembers ? guildMembers.has(owner.toLowerCase()) : true;
+      const matchesGuildMembers = filterByGuildMembers ? guildMemberAddresses.has(owner.toLowerCase()) : true;
       return matchesSearch && matchesResource && matchesTroop && matchesOwner && matchesGuildMembers;
     }).sort((a, b) => {
       if (sortBy === 'name') {
@@ -152,7 +186,7 @@ const Dashboard = () => {
         return a.id - b.id;
       }
     });
-  }, [realms, searchTerm, selectedResource, selectedTroop, selectedOwnerFilter, sortBy, filterByGuildMembers, guildMembers]);
+  }, [realms, searchTerm, selectedResource, selectedTroop, selectedOwnerFilter, sortBy, filterByGuildMembers, guildMemberAddresses]);
 
   useEffect(() => {
     if (loading || isRefreshingOwners) {
@@ -226,8 +260,8 @@ const Dashboard = () => {
     }));
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Realms');
-    XLSX.writeFile(workbook, 'realms_export.xlsx');
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'S1 Passes');
+    XLSX.writeFile(workbook, 's1_passes_export.xlsx');
   };
 
   const handleRefreshOwners = async () => {
@@ -280,7 +314,7 @@ const Dashboard = () => {
     <div className="dashboard compact-list">
       <div className="dashboard-main-table">
         <div className="dashboard-header">
-          <h1>Realms Dashboard</h1>
+          <h1>S1 Season Pass Dashboard</h1>
         </div>
         <div className="filters">
           {/* Row 1: Filters */}
@@ -302,7 +336,7 @@ const Dashboard = () => {
             </select>
             <input
               type="text"
-              placeholder="Search realms..."
+              placeholder="Search S1 Passes..."
               value={searchTerm}
               onChange={(e) => {
                 const value = e.target.value;
@@ -367,8 +401,8 @@ const Dashboard = () => {
               className="filter-select"
             >
               <option value="">All Owners</option>
-              {uniqueOwners.sort().map(owner => (
-                <option key={owner} value={owner}>{owner.substring(0, 6)}...{owner.substring(owner.length - 4)}</option>
+              {uniqueOwnersForFilter.map(owner => (
+                <option key={owner.value} value={owner.value}>{owner.label}</option>
               ))}
             </select>
             <div className="filter-checkbox-wrapper" title={loadingMembers ? "Loading member list..." : ""}>
@@ -443,6 +477,13 @@ const Dashboard = () => {
             </div>
             {filteredRealms.map((realm) => {
               const owner = realm.owner || '';
+              const ownerLowercase = owner.toLowerCase();
+              const isGuildMember = guildMemberAddresses.has(ownerLowercase);
+              // Get username if owner is a guild member, otherwise use truncated address
+              const displayOwner = isGuildMember 
+                ? memberAddressToUsernameMap.get(ownerLowercase) || owner // Fallback to address if map somehow fails
+                : owner ? `${owner.substring(0, 6)}...${owner.substring(owner.length - 4)}` : '-';
+              
               const hasWSC = realm.resources.some(r => r.resource === ResourcesIds.Wood)
                 && realm.resources.some(r => r.resource === ResourcesIds.Stone)
                 && realm.resources.some(r => r.resource === ResourcesIds.Coal);
@@ -454,7 +495,7 @@ const Dashboard = () => {
                   <span className="col-id">{realm.id}</span>
                   <span className="col-name">{realm.name}</span>
                   <span className="col-owner" title={owner}>
-                    {owner ? `${owner.substring(0, 6)}...${owner.substring(owner.length - 4)}` : '-'}
+                    {displayOwner}
                   </span>
                   <span className="col-wsc">{hasWSC ? '✓' : ''}</span>
                   <span className="col-resources">
@@ -488,9 +529,9 @@ const Dashboard = () => {
         </div>
       </div>
       <div className="dashboard-summary-panel">
-        <h2>Realms Summary</h2>
-        <div><b>Filtered Realms:</b> {summaryRealms.length}</div>
-        <div><b>WSC Realms:</b> {summaryWSCCount}</div>
+        <h2>Display Summary</h2>
+        <div><b>Passes displayed:</b> {summaryRealms.length}</div>
+        <div><b>WSC number:</b> {summaryWSCCount}</div>
         <div style={{ marginTop: '1em' }}><b>Troops:</b></div>
         <ul>
           {Object.entries(summaryTroopCounts).map(([name, count]) => {

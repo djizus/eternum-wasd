@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import './MembersPage.css';
 
 interface Member {
   _id?: string;
   address?: string;
   username?: string;
+  realmCount?: number;
 }
 
 const MembersPage: React.FC = () => {
@@ -20,15 +21,39 @@ const MembersPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/members');
+      const res = await fetch('/api/members-with-realm-counts');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to fetch members data (${res.status})`);
+      }
       const data = await res.json();
       setMembers(data);
-    } catch (_err) {
-      setError('Failed to fetch members');
+    } catch (err: unknown) {
+      console.error("Failed to fetch members:", err);
+      let errorMessage = 'Failed to fetch members';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      setError(errorMessage);
+      setMembers([]);
     } finally {
       setLoading(false);
     }
   };
+
+  // Sort members by realmCount descending, then by username ascending as a secondary sort
+  const sortedMembers = useMemo(() => {
+    if (!members) return [];
+    return [...members].sort((a, b) => {
+      // Sort by realmCount descending
+      const realmCountDiff = (b.realmCount || 0) - (a.realmCount || 0);
+      if (realmCountDiff !== 0) {
+        return realmCountDiff;
+      }
+      // If realmCount is the same, sort by username ascending (case-insensitive)
+      return (a.username || '').toLowerCase().localeCompare((b.username || '').toLowerCase());
+    });
+  }, [members]);
 
   useEffect(() => {
     fetchMembers();
@@ -111,7 +136,8 @@ const MembersPage: React.FC = () => {
     }
   };
 
-  const filteredMembers = members.filter(member => {
+  // Use sortedMembers for filtering
+  const filteredMembers = sortedMembers.filter(member => {
     const searchLower = searchTerm.toLowerCase();
     return (
       (member.username?.toLowerCase().includes(searchLower) || false) ||
@@ -178,6 +204,7 @@ const MembersPage: React.FC = () => {
         <div className="members-list-header">
           <div className="header-cell username">Username</div>
           <div className="header-cell address">Address</div>
+          <div className="header-cell realm-count">Season Passes</div>
           <div className="header-cell actions">Actions</div>
         </div>
         
@@ -193,6 +220,9 @@ const MembersPage: React.FC = () => {
               </div>
               <div className="member-cell address">
                 {member.address || <span className="empty-value">-</span>}
+              </div>
+              <div className="member-cell realm-count">
+                {member.realmCount !== undefined ? member.realmCount : 'N/A'}
               </div>
               <div className="member-cell actions">
                 <button
