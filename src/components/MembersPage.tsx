@@ -22,7 +22,7 @@ const MembersPage: React.FC = () => {
       const res = await fetch('/api/members');
       const data = await res.json();
       setMembers(data);
-    } catch (err) {
+    } catch (_err) {
       setError('Failed to fetch members');
     } finally {
       setLoading(false);
@@ -51,7 +51,7 @@ const MembersPage: React.FC = () => {
       setAddress('');
       setUsername('');
       fetchMembers();
-    } catch (err) {
+    } catch (_err) {
       setError('Failed to add member');
     } finally {
       setLoading(false);
@@ -71,7 +71,7 @@ const MembersPage: React.FC = () => {
       });
       if (!res.ok) throw new Error('Failed to remove member');
       fetchMembers();
-    } catch (err) {
+    } catch (_err) {
       setError('Failed to remove member');
     } finally {
       setLoading(false);

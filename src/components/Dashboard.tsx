@@ -66,9 +66,16 @@ const troopTierMap: Record<string, 'T1' | 'T2' | 'T3'> = {
   KnightT3: 'T3', CrossbowmanT3: 'T3', PaladinT3: 'T3',
 };
 
+interface Member {
+  address?: string;
+  // Add other fields if needed, like username, but address is key for filtering
+}
+
 const Dashboard = () => {
   const [realms, setRealms] = useState<Realm[]>([]);
+  const [guildMembers, setGuildMembers] = useState<Set<string>>(new Set()); // Store member addresses (lowercase) in a Set for efficient lookup
   const [loading, setLoading] = useState(true);
+  const [loadingMembers, setLoadingMembers] = useState(true); // Separate loading state for members
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedResource, setSelectedResource] = useState<ResourcesIds | null>(null);
   const [selectedTroop, setSelectedTroop] = useState<ResourcesIds | null>(null);
@@ -76,21 +83,44 @@ const Dashboard = () => {
   const [sortBy, setSortBy] = useState<'name' | 'id'>('id');
   const [isProcessingFilters, setIsProcessingFilters] = useState(false);
   const [isRefreshingOwners, setIsRefreshingOwners] = useState(false);
+  const [filterByGuildMembers, setFilterByGuildMembers] = useState<boolean>(false); // New filter state
 
   useEffect(() => {
     const fetchInitialData = async () => {
       setLoading(true);
+      setLoadingMembers(true);
       try {
-        const loadedRealms = await loadRealms();
+        // Fetch realms and members in parallel
+        const [loadedRealms, memberResponse] = await Promise.all([
+          loadRealms(),
+          fetch('/api/members') // Fetch member data
+        ]);
+        
         setRealms(loadedRealms);
+
+        // Process members data
+        if (memberResponse.ok) {
+          const membersData: Member[] = await memberResponse.json();
+          const memberAddresses = new Set(membersData
+            .map(member => member.address?.toLowerCase()) // Get lowercase address
+            .filter((address): address is string => !!address) // Filter out undefined/null addresses
+          );
+          setGuildMembers(memberAddresses);
+          console.log(`Loaded ${memberAddresses.size} guild member addresses.`);
+        } else {
+          console.error('Failed to fetch guild members:', memberResponse.statusText);
+          // Optionally set an error state here
+        }
+
       } catch (error) {
         console.error('Error loading initial data:', error);
       } finally {
         setLoading(false);
+        setLoadingMembers(false);
       }
     };
     fetchInitialData();
-  }, []);
+  }, []); // Empty dependency array means this runs once on mount
 
   const uniqueOwners = useMemo(() => {
     const owners = new Set<string>();
@@ -113,7 +143,8 @@ const Dashboard = () => {
       const matchesResource = !selectedResource || realm.resources.some(r => r.resource === selectedResource);
       const matchesTroop = !selectedTroop || realm.availableTroops.includes(selectedTroop);
       const matchesOwner = !selectedOwnerFilter || owner === selectedOwnerFilter;
-      return matchesSearch && matchesResource && matchesTroop && matchesOwner;
+      const matchesGuildMembers = filterByGuildMembers ? guildMembers.has(owner.toLowerCase()) : true;
+      return matchesSearch && matchesResource && matchesTroop && matchesOwner && matchesGuildMembers;
     }).sort((a, b) => {
       if (sortBy === 'name') {
         return a.name.localeCompare(b.name);
@@ -121,7 +152,7 @@ const Dashboard = () => {
         return a.id - b.id;
       }
     });
-  }, [realms, searchTerm, selectedResource, selectedTroop, selectedOwnerFilter, sortBy]);
+  }, [realms, searchTerm, selectedResource, selectedTroop, selectedOwnerFilter, sortBy, filterByGuildMembers, guildMembers]);
 
   useEffect(() => {
     if (loading || isRefreshingOwners) {
@@ -201,13 +232,37 @@ const Dashboard = () => {
 
   const handleRefreshOwners = async () => {
     setIsRefreshingOwners(true);
-    console.log('Manual refresh triggered');
+    console.log('Manual owner refresh triggered');
     try {
-      const loadedRealms = await loadRealms();
+      // Call the backend API to trigger the update process
+      const updateResponse = await fetch('/api/update-owners', {
+        method: 'POST',
+        // No body needed unless sending parameters
+      });
+
+      if (!updateResponse.ok) {
+        // Try to get error message from response body
+        let errorMsg = `API call failed with status ${updateResponse.status}`;
+        try {
+            const errorData = await updateResponse.json();
+            errorMsg = errorData.error || errorMsg;
+        } catch (e) { /* ignore json parsing error */ }
+        throw new Error(errorMsg);
+      }
+
+      const result = await updateResponse.json();
+      console.log('Owner update API response:', result);
+
+      // If update was successful, reload realm data from the primary API
+      console.log('Reloading realm data from /api/realms...');
+      const loadedRealms = await loadRealms(); // Fetches from /api/realms (which reads DB)
       setRealms(loadedRealms);
-      console.log('Manual refresh complete');
+      console.log('Manual refresh complete, data reloaded.');
+
     } catch (error) {
-      console.error('Error during manual refresh:', error);
+      console.error('Error during manual owner refresh:', error);
+      // Here you might want to show an error message to the user
+      alert(`Failed to refresh owners: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setIsRefreshingOwners(false);
     }
@@ -228,123 +283,147 @@ const Dashboard = () => {
           <h1>Realms Dashboard</h1>
         </div>
         <div className="filters">
-          <select
-            value={sortBy}
-            onChange={(e) => {
-              const value = e.target.value as 'name' | 'id';
-              setIsProcessingFilters(true);
-              setTimeout(() => {
-                setSortBy(value);
-                setIsProcessingFilters(false);
-              }, 0);
-            }}
-            className="filter-select"
-          >
-            <option value="name">Sort by Name</option>
-            <option value="id">Sort by ID</option>
-          </select>
-          <input
-            type="text"
-            placeholder="Search realms..."
-            value={searchTerm}
-            onChange={(e) => {
-              const value = e.target.value;
-              setIsProcessingFilters(true);
-              setTimeout(() => {
-                setSearchTerm(value);
-                setIsProcessingFilters(false);
-              }, 0);
-            }}
-            className="search-input"
-          />
-          <select
-            value={selectedResource || ''}
-            onChange={(e) => {
-              const value = e.target.value ? Number(e.target.value) : null;
-              setIsProcessingFilters(true);
-              setTimeout(() => {
-                setSelectedResource(value);
-                setIsProcessingFilters(false);
-              }, 0);
-            }}
-            className="filter-select"
-          >
-            <option value="">All Resources</option>
-            {Object.values(ResourcesIds)
-              .filter((id): id is ResourcesIds => typeof id === 'number' && !TROOP_IDS.includes(id) && !EXCLUDED_RESOURCES.includes(id))
-              .map((id) => (
-                <option key={`resource-${id}`} value={id}>
-                  {ResourcesIds[id]}
+          {/* Row 1: Filters */}
+          <div className="filter-row">
+            <select
+              value={sortBy}
+              onChange={(e) => {
+                const value = e.target.value as 'name' | 'id';
+                setIsProcessingFilters(true);
+                setTimeout(() => {
+                  setSortBy(value);
+                  setIsProcessingFilters(false);
+                }, 0);
+              }}
+              className="filter-select"
+            >
+              <option value="name">Sort by Name</option>
+              <option value="id">Sort by ID</option>
+            </select>
+            <input
+              type="text"
+              placeholder="Search realms..."
+              value={searchTerm}
+              onChange={(e) => {
+                const value = e.target.value;
+                setIsProcessingFilters(true);
+                setTimeout(() => {
+                  setSearchTerm(value);
+                  setIsProcessingFilters(false);
+                }, 0);
+              }}
+              className="search-input"
+            />
+            <select
+              value={selectedResource || ''}
+              onChange={(e) => {
+                const value = e.target.value ? Number(e.target.value) : null;
+                setIsProcessingFilters(true);
+                setTimeout(() => {
+                  setSelectedResource(value);
+                  setIsProcessingFilters(false);
+                }, 0);
+              }}
+              className="filter-select"
+            >
+              <option value="">All Resources</option>
+              {Object.values(ResourcesIds)
+                .filter((id): id is ResourcesIds => typeof id === 'number' && !TROOP_IDS.includes(id) && !EXCLUDED_RESOURCES.includes(id))
+                .map((id) => (
+                  <option key={`resource-${id}`} value={id}>
+                    {ResourcesIds[id]}
+                  </option>
+                ))}
+            </select>
+            <select
+              value={selectedTroop || ''}
+              onChange={(e) => {
+                const value = e.target.value ? Number(e.target.value) : null;
+                setIsProcessingFilters(true);
+                setTimeout(() => {
+                  setSelectedTroop(value);
+                  setIsProcessingFilters(false);
+                }, 0);
+              }}
+              className="filter-select"
+            >
+              <option value="">All Army Types</option>
+              {TROOP_TYPES.map(({ key, value }) => (
+                <option key={`troop-${value}`} value={value}>
+                  {key}
                 </option>
               ))}
-          </select>
-          <select
-            value={selectedTroop || ''}
-            onChange={(e) => {
-              const value = e.target.value ? Number(e.target.value) : null;
-              setIsProcessingFilters(true);
-              setTimeout(() => {
-                setSelectedTroop(value);
-                setIsProcessingFilters(false);
-              }, 0);
-            }}
-            className="filter-select"
-          >
-            <option value="">All Army Types</option>
-            {TROOP_TYPES.map(({ key, value }) => (
-              <option key={`troop-${value}`} value={value}>
-                {key}
-              </option>
-            ))}
-          </select>
-          <select
-            value={selectedOwnerFilter}
-            onChange={(e) => {
-              const value = e.target.value;
-              setIsProcessingFilters(true);
-              setTimeout(() => {
-                setSelectedOwnerFilter(value);
-                setIsProcessingFilters(false);
-              }, 0);
-            }}
-            className="filter-select"
-          >
-            <option value="">All Owners</option>
-            {uniqueOwners.sort().map(owner => (
-              <option key={owner} value={owner}>{owner.substring(0, 6)}...{owner.substring(owner.length - 4)}</option>
-            ))}
-          </select>
-          <button
-            className="clear-filters-btn"
-            onClick={() => {
-              setIsProcessingFilters(true);
-              setTimeout(() => {
-                setSearchTerm('');
-                setSelectedResource(null);
-                setSelectedTroop(null);
-                setSelectedOwnerFilter('');
-                setIsProcessingFilters(false);
-              }, 0);
-            }}
-            style={{ marginLeft: '0.5rem', padding: '0.4rem 1rem', borderRadius: '4px', border: 'none', background: '#333', color: '#fff', cursor: 'pointer' }}
-          >
-            Clear Filters
-          </button>
-          <button
-            className="refresh-owners-btn"
-            onClick={handleRefreshOwners}
-            disabled={isRefreshingOwners}
-            style={{ marginLeft: '0.5rem', padding: '0.4rem 1rem', borderRadius: '4px', border: 'none', background: '#5a5a5a', color: '#fff', cursor: 'pointer', opacity: isRefreshingOwners ? 0.6 : 1 }}
-          >
-            {isRefreshingOwners ? 'Refreshing...' : 'Refresh Owners'}
-          </button>
-          <button
-            className="export-excel-btn"
-            onClick={handleExportExcel}
-            style={{ marginLeft: '0.5rem', padding: '0.4rem 1rem', borderRadius: '4px', border: 'none', background: '#8ec6ff', color: '#000', fontWeight: 600, cursor: 'pointer' }}
-          >
-            Export to Excel
-          </button>
+            </select>
+            <select
+              value={selectedOwnerFilter}
+              onChange={(e) => {
+                const value = e.target.value;
+                setIsProcessingFilters(true);
+                setTimeout(() => {
+                  setSelectedOwnerFilter(value);
+                  setIsProcessingFilters(false);
+                }, 0);
+              }}
+              className="filter-select"
+            >
+              <option value="">All Owners</option>
+              {uniqueOwners.sort().map(owner => (
+                <option key={owner} value={owner}>{owner.substring(0, 6)}...{owner.substring(owner.length - 4)}</option>
+              ))}
+            </select>
+            <div className="filter-checkbox-wrapper" title={loadingMembers ? "Loading member list..." : ""}>
+              <input 
+                type="checkbox"
+                id="guildFilterCheckbox"
+                checked={filterByGuildMembers}
+                disabled={loadingMembers}
+                onChange={(_e) => {
+                  const isChecked = _e.target.checked;
+                  setIsProcessingFilters(true);
+                  setTimeout(() => {
+                    setFilterByGuildMembers(isChecked);
+                    setIsProcessingFilters(false);
+                  }, 0);
+                }}
+              />
+              <label htmlFor="guildFilterCheckbox">Guild Members Only</label>
+            </div>
+          </div>
+          
+          {/* Row 2: Action Buttons */}
+          <div className="action-buttons-row">
+            <button
+              className="clear-filters-btn"
+              onClick={() => {
+                setIsProcessingFilters(true);
+                setTimeout(() => {
+                  setSearchTerm('');
+                  setSelectedResource(null);
+                  setSelectedTroop(null);
+                  setSelectedOwnerFilter('');
+                  setFilterByGuildMembers(false);
+                  setIsProcessingFilters(false);
+                }, 0);
+              }}
+            >
+              Clear Filters
+            </button>
+            <button
+              className="refresh-owners-btn"
+              onClick={handleRefreshOwners}
+              disabled={isRefreshingOwners}
+              style={{ marginLeft: '0.5rem', padding: '0.4rem 1rem', borderRadius: '4px', border: 'none', background: '#5a5a5a', color: '#fff', cursor: 'pointer', opacity: isRefreshingOwners ? 0.6 : 1 }}
+            >
+              {isRefreshingOwners ? 'Refreshing Owners...' : 'Refresh Owners'}
+            </button>
+            <button
+              className="export-excel-btn"
+              onClick={handleExportExcel}
+              style={{ marginLeft: '0.5rem', padding: '0.4rem 1rem', borderRadius: '4px', border: 'none', background: '#8ec6ff', color: '#000', fontWeight: 600, cursor: 'pointer' }}
+            >
+              Export to Excel
+            </button>
+          </div>
         </div>
         <div className="realms-list-wrapper">
           {/* Conditionally render overlay */}
@@ -441,4 +520,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard; 
+export default Dashboard;

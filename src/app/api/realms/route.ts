@@ -23,7 +23,7 @@ export async function GET(request: Request) {
         return NextResponse.json({});
       }
       // Create a new object excluding the _id property
-      const { _id, ...realmsWithoutId } = allRealmsDoc;
+      const { _id: __id, ...realmsWithoutId } = allRealmsDoc;
       return NextResponse.json(realmsWithoutId);
     }
   } catch (error) {
