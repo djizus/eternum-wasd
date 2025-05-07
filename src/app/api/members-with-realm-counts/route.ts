@@ -9,6 +9,9 @@ interface Member {
   _id?: string;
   address?: string;
   username?: string;
+  role?: 'warmonger' | 'farmer' | 'hybrid' | null; // Added role to interface
+  isElite?: boolean; // Added isElite to interface
+  realmCount?: number; // This is added by the aggregation
 }
 
 // Define the structure returned by this API route
@@ -37,8 +40,10 @@ export async function GET() {
   try {
     const db = await getDatabase();
     
-    // 1. Fetch all members
+    // 1. Fetch all members - ensure isElite is fetched if present
     const membersCollection = db.collection('members');
+    // No specific projection needed here for find, as it fetches all fields by default.
+    // The `isElite` field will be included if it exists on the documents.
     const members: Member[] = await membersCollection.find<Member>({}).toArray();
     console.log(`Fetched ${members.length} members`);
 

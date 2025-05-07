@@ -35,6 +35,12 @@ const Header: React.FC = () => {
               >
                 Members
               </Link>
+              <Link 
+                href="/settling-map" 
+                className={`nav-link ${pathname === '/settling-map' ? 'active' : ''}`}
+              >
+                Settling Map
+              </Link>
             </>
           )}
         </nav>

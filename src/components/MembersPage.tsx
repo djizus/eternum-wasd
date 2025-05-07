@@ -6,6 +6,8 @@ interface Member {
   address?: string;
   username?: string;
   realmCount?: number;
+  role?: 'warmonger' | 'farmer' | 'hybrid' | null;
+  isElite?: boolean;
 }
 
 const MembersPage: React.FC = () => {
@@ -16,6 +18,10 @@ const MembersPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [fetchingAddress, setFetchingAddress] = useState(false);
+  const [memberRoles, setMemberRoles] = useState<Record<string, Member['role']>>({});
+  const [savingRoleForMember, setSavingRoleForMember] = useState<string | null>(null);
+  const [memberEliteStatus, setMemberEliteStatus] = useState<Record<string, boolean>>({});
+  const [savingEliteForMember, setSavingEliteForMember] = useState<string | null>(null);
 
   const fetchMembers = async () => {
     setLoading(true);
@@ -28,6 +34,17 @@ const MembersPage: React.FC = () => {
       }
       const data = await res.json();
       setMembers(data);
+      const initialRoles: Record<string, Member['role']> = {};
+      const initialEliteStatus: Record<string, boolean> = {};
+      data.forEach((member: Member) => {
+        const memberKey = member._id || member.address;
+        if (memberKey) {
+          initialRoles[memberKey] = member.role || null;
+          initialEliteStatus[memberKey] = member.isElite || false;
+        }
+      });
+      setMemberRoles(initialRoles);
+      setMemberEliteStatus(initialEliteStatus);
     } catch (err: unknown) {
       console.error("Failed to fetch members:", err);
       let errorMessage = 'Failed to fetch members';
@@ -41,16 +58,13 @@ const MembersPage: React.FC = () => {
     }
   };
 
-  // Sort members by realmCount descending, then by username ascending as a secondary sort
   const sortedMembers = useMemo(() => {
     if (!members) return [];
     return [...members].sort((a, b) => {
-      // Sort by realmCount descending
       const realmCountDiff = (b.realmCount || 0) - (a.realmCount || 0);
       if (realmCountDiff !== 0) {
         return realmCountDiff;
       }
-      // If realmCount is the same, sort by username ascending (case-insensitive)
       return (a.username || '').toLowerCase().localeCompare((b.username || '').toLowerCase());
     });
   }, [members]);
@@ -136,14 +150,127 @@ const MembersPage: React.FC = () => {
     }
   };
 
-  // Use sortedMembers for filtering
   const filteredMembers = sortedMembers.filter(member => {
     const searchLower = searchTerm.toLowerCase();
     return (
       (member.username?.toLowerCase().includes(searchLower) || false) ||
-      (member.address?.toLowerCase().includes(searchLower) || false)
+      (member.role?.toLowerCase().includes(searchLower) || false)
     );
   });
+
+  const handleRoleChange = async (member: Member, newRole: Member['role']) => {
+    const memberKey = member._id || member.address;
+    if (!memberKey) {
+      setError("Cannot update role: Member identifier is missing.");
+      return;
+    }
+
+    const originalRole = memberRoles[memberKey];
+
+    setMemberRoles(prevRoles => ({
+      ...prevRoles,
+      [memberKey]: newRole,
+    }));
+    setSavingRoleForMember(memberKey);
+    setError(null);
+
+    try {
+      const payload = [{
+        identifier: memberKey,
+        id: member._id,
+        address: member.address,
+        role: newRole
+      }];
+
+      const res = await fetch('/api/members/roles', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roles: payload }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        setMemberRoles(prevRoles => ({
+          ...prevRoles,
+          [memberKey]: originalRole,
+        }));
+        throw new Error(errorData.error || `Failed to save role for ${member.username || memberKey} (${res.status})`);
+      }
+      
+      setMembers(prevMembers => 
+        prevMembers.map(m => 
+          (m._id || m.address) === memberKey ? { ...m, role: newRole } : m
+        )
+      );
+
+    } catch (err: unknown) {
+      console.error("Failed to save role:", err);
+      let errorMessage = 'Failed to save role';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      setError(errorMessage);
+    } finally {
+      setSavingRoleForMember(null);
+    }
+  };
+
+  const handleEliteChange = async (member: Member, newIsElite: boolean) => {
+    const memberKey = member._id || member.address;
+    if (!memberKey) {
+      setError("Cannot update elite status: Member identifier is missing.");
+      return;
+    }
+
+    const originalIsElite = memberEliteStatus[memberKey];
+
+    setMemberEliteStatus(prevStatus => ({
+      ...prevStatus,
+      [memberKey]: newIsElite,
+    }));
+    setSavingEliteForMember(memberKey);
+    setError(null);
+
+    try {
+      const payload = {
+        identifier: memberKey,
+        id: member._id,
+        address: member.address,
+        isElite: newIsElite
+      };
+
+      const res = await fetch('/api/members/update-elite', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        setMemberEliteStatus(prevStatus => ({
+          ...prevStatus,
+          [memberKey]: originalIsElite,
+        }));
+        throw new Error(errorData.error || `Failed to save elite status for ${member.username || memberKey} (${res.status})`);
+      }
+
+      setMembers(prevMembers =>
+        prevMembers.map(m =>
+          (m._id || m.address) === memberKey ? { ...m, isElite: newIsElite } : m
+        )
+      );
+
+    } catch (err: unknown) {
+      console.error("Failed to save elite status:", err);
+      let errorMessage = 'Failed to save elite status';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      setError(errorMessage);
+    } finally {
+      setSavingEliteForMember(null);
+    }
+  };
 
   return (
     <div className="members-root">
@@ -202,39 +329,62 @@ const MembersPage: React.FC = () => {
 
       <div className="members-list">
         <div className="members-list-header">
-          <div className="header-cell username">Username</div>
-          <div className="header-cell address">Address</div>
+          <div className="header-cell username">Controller name</div>
           <div className="header-cell realm-count">Season Passes</div>
+          <div className="header-cell role">Role</div>
+          <div className="header-cell elite">Elite Unit</div>
           <div className="header-cell actions">Actions</div>
         </div>
         
-        {loading ? (
+        {loading && members.length === 0 ? (
           <div className="loading-message">Loading members...</div>
         ) : filteredMembers.length === 0 ? (
           <div className="no-members">No members found</div>
         ) : (
-          filteredMembers.map((member) => (
-            <div key={member._id || member.address || member.username} className="member-row">
-              <div className="member-cell username">
-                {member.username || <span className="empty-value">-</span>}
+          filteredMembers.map((member) => {
+            const memberKey = member._id || member.address || Date.now().toString();
+            return (
+              <div key={memberKey} className="member-row">
+                <div className="member-cell username">
+                  {member.username || <span className="empty-value">-</span>}
+                </div>
+                <div className="member-cell realm-count">
+                  {member.realmCount !== undefined ? member.realmCount : 'N/A'}
+                </div>
+                <div className="member-cell role">
+                  <select
+                    value={memberRoles[memberKey] || ''}
+                    onChange={(e) => handleRoleChange(member, e.target.value as Member['role'])}
+                    disabled={loading || savingRoleForMember === memberKey || savingEliteForMember === memberKey}
+                    className="role-select"
+                  >
+                    <option value="">Select Role</option>
+                    <option value="warmonger">Warmonger</option>
+                    <option value="farmer">Farmer</option>
+                    <option value="hybrid">Hybrid</option>
+                  </select>
+                </div>
+                <div className="member-cell elite">
+                  <input 
+                    type="checkbox"
+                    checked={memberEliteStatus[memberKey] || false}
+                    onChange={(e) => handleEliteChange(member, e.target.checked)}
+                    disabled={loading || savingRoleForMember === memberKey || savingEliteForMember === memberKey}
+                    className="elite-checkbox"
+                  />
+                </div>
+                <div className="member-cell actions">
+                  <button
+                    onClick={() => handleRemove(member)}
+                    className="remove-button"
+                    disabled={loading || savingRoleForMember === memberKey || savingEliteForMember === memberKey}
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
-              <div className="member-cell address">
-                {member.address || <span className="empty-value">-</span>}
-              </div>
-              <div className="member-cell realm-count">
-                {member.realmCount !== undefined ? member.realmCount : 'N/A'}
-              </div>
-              <div className="member-cell actions">
-                <button
-                  onClick={() => handleRemove(member)}
-                  className="remove-button"
-                  disabled={loading}
-                >
-                  Remove
-                </button>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
