@@ -1,10 +1,11 @@
 'use client';
 
-import MembersPage from '@/components/MembersPage';
+import Dashboard from '@/components/Dashboard';
 import { useSession } from 'next-auth/react';
 import React from 'react';
 
-export default function Members() {
+// This component renders the original dashboard content
+export default function SeasonPassesDashboardPage() {
   const { status } = useSession();
 
   if (status === 'loading') {
@@ -12,13 +13,13 @@ export default function Members() {
   }
 
   if (status === 'authenticated') {
-    return <MembersPage />;
+    return <Dashboard />; // Render the actual Dashboard component
   }
 
   // Redirect or show message if not authenticated
   return (
     <div className="unauthenticated-message">
-      Please log in using Discord to access the Members page.
+      Please log in using Discord to access the Season Passes Dashboard.
     </div>
   );
 } 

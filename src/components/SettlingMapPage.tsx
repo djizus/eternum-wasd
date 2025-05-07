@@ -69,7 +69,9 @@ const ZONE_COLORS: { [key: number]: string } = {
   7: '#51cf66', // Bright Green
   8: '#fcc419', // Yellow
   9: '#ff922b', // Orange
-  10: '#ff6b6b' // Coral/Light Red
+  10: '#ff6b6b', // Coral/Light Red
+  11: '#fa5252', // Red
+  12: '#e03131'  // Deeper Red
 };
 
 const SettlingMapPage: React.FC = () => {

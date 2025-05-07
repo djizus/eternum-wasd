@@ -27,19 +27,19 @@ const Header: React.FC = () => {
                 href="/" 
                 className={`nav-link ${pathname === '/' ? 'active' : ''}`}
               >
-                Dashboard
+                Settling Map
+              </Link>
+              <Link 
+                href="/season-passes" 
+                className={`nav-link ${pathname === '/season-passes' ? 'active' : ''}`}
+              >
+                Season Passes Dashboard
               </Link>
               <Link 
                 href="/members" 
                 className={`nav-link ${pathname === '/members' ? 'active' : ''}`}
               >
                 Members
-              </Link>
-              <Link 
-                href="/settling-map" 
-                className={`nav-link ${pathname === '/settling-map' ? 'active' : ''}`}
-              >
-                Settling Map
               </Link>
             </>
           )}

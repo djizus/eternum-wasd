@@ -1,6 +1,8 @@
 'use client';
 
-import Dashboard from '@/components/Dashboard';
+import SettlingMapPage from '@/components/SettlingMapPage';
+// We might still need auth checks depending on whether the map is public or not
+// Keeping session check for now, adjust if map should be public
 import { useSession } from 'next-auth/react';
 import React from 'react';
 
@@ -11,13 +13,15 @@ export default function Home() {
     return <div className="loading-fullpage">Checking authentication...</div>;
   }
 
+  // Render SettlingMapPage if authenticated, otherwise show login message
+  // Modify this logic if the map should be accessible without login
   if (status === 'authenticated') {
-    return <Dashboard />;
+     return <SettlingMapPage />;
   }
-
+  
   return (
     <div className="unauthenticated-message">
-      Please log in using Discord to access the dashboard.
+      Please log in using Discord to access the map.
     </div>
   );
 } 
