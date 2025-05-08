@@ -194,16 +194,44 @@ const SettlingMapPage: React.FC = () => {
           {selectedHex && (
             <div className="selected-hex-info-overlay">
               <h3>Selected: {selectedHex.type}</h3>
-              {selectedHex.layer !== undefined && <p>Layer: {selectedHex.layer}, Point: {selectedHex.point}</p>}
-              <p>Normalized X: {selectedHex.normalizedX}, Y: {selectedHex.normalizedY}</p>
-              {selectedHex.originalContractX !== undefined && 
-                <p>Contract X: {selectedHex.originalContractX}, Y: {selectedHex.originalContractY}</p>}
-              {selectedHex.side !== undefined && <p>Side: {selectedHex.side}</p>}
+              {selectedZoneInfo && (() => {
+                const { zoneName, zoneId } = selectedZoneInfo;
+                let suffix = '';
+                if (zoneId >= 1 && zoneId <= 6) {
+                  suffix = ' (Center)';
+                } else if (zoneId >= 7 && zoneId <= 12) {
+                  suffix = ' (Bank)';
+                }
+
+                let finalDisplayName = zoneName;
+                if (suffix) {
+                  const lowerZoneName = zoneName.toLowerCase();
+                  // Only add suffix if zoneName doesn't already contain a pattern like " (bank" or " (center"
+                  if (!lowerZoneName.includes(' (bank') && !lowerZoneName.includes(' (center')) {
+                    finalDisplayName = `${zoneName}${suffix}`;
+                  }
+                }
+                
+                return (
+                  <h4 style={{
+                    color: ZONE_COLORS[zoneId] || 'inherit',
+                    margin: '0.5em 0',
+                    fontWeight: 'bold',
+                    textAlign: 'center',
+                    fontSize: '1.5em'
+                  }}>
+                    {finalDisplayName}
+                  </h4>
+                );
+              })()}
+              {selectedHex.side !== undefined && selectedHex.layer !== undefined && selectedHex.point !== undefined && 
+                <p>Side, Layer, Point : ({selectedHex.side}, {selectedHex.layer}, {selectedHex.point})</p>}
+              {(selectedHex.normalizedX !== undefined && selectedHex.normalizedY !== undefined) && 
+                <p>Normalized X, Y : ({selectedHex.normalizedX}, {selectedHex.normalizedY})</p>}
               
               {selectedHex.originalContractX !== undefined && selectedHex.originalContractY !== undefined && 
                occupiedSpotsSet.has(`${selectedHex.originalContractX}-${selectedHex.originalContractY}`) && 
                 <p>Status: Occupied</p>}
-              {selectedZoneInfo && <p>Zone: {selectedZoneInfo.zoneName} (ID: {selectedZoneInfo.zoneId})</p>}
             </div>
           )}
           {!selectedHex && (
@@ -225,7 +253,7 @@ const SettlingMapPage: React.FC = () => {
                       className="legend-color-swatch"
                       style={{ backgroundColor: ZONE_COLORS[zone.zoneId] || '#ccc' }}
                     ></span>
-                    {zone.name} (ID: {zone.zoneId})
+                    Zone {zone.zoneId}
                   </li>
                 ))}
               </ul>

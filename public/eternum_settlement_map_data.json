@@ -18463,7 +18463,7 @@
   "zones": [
     {
       "zoneId": 1,
-      "name": "Zone 1 (NE)",
+      "name": "Zone 1",
       "locations": [
         {
           "normalizedX": 38,
@@ -18919,7 +18919,7 @@
     },
     {
       "zoneId": 2,
-      "name": "Zone 2 (E)",
+      "name": "Zone 2",
       "locations": [
         {
           "normalizedX": 68,
@@ -19375,7 +19375,7 @@
     },
     {
       "zoneId": 3,
-      "name": "Zone 3 (SE)",
+      "name": "Zone 3",
       "locations": [
         {
           "normalizedX": -52,
@@ -19831,7 +19831,7 @@
     },
     {
       "zoneId": 4,
-      "name": "Zone 4 (SW)",
+      "name": "Zone 4",
       "locations": [
         {
           "normalizedX": -42,
@@ -20287,7 +20287,7 @@
     },
     {
       "zoneId": 5,
-      "name": "Zone 5 (W)",
+      "name": "Zone 5",
       "locations": [
         {
           "normalizedX": 10,
@@ -20743,7 +20743,7 @@
     },
     {
       "zoneId": 6,
-      "name": "Zone 6 (NW)",
+      "name": "Zone 6",
       "locations": [
         {
           "normalizedX": -10,
@@ -21199,7 +21199,7 @@
     },
     {
       "zoneId": 7,
-      "name": "Zone 7 (Bank 1)",
+      "name": "Zone 7",
       "locations": [
         {
           "normalizedX": -90,
@@ -21209,15 +21209,6 @@
           "side": 5,
           "layer": 21,
           "point": 19
-        },
-        {
-          "normalizedX": -132,
-          "normalizedY": 215,
-          "originalContractX": 2147483514,
-          "originalContractY": 2147483861,
-          "side": 2,
-          "layer": 22,
-          "point": 20
         },
         {
           "normalizedX": -127,
@@ -21238,24 +21229,6 @@
           "point": 18
         },
         {
-          "normalizedX": -95,
-          "normalizedY": 240,
-          "originalContractX": 2147483551,
-          "originalContractY": 2147483886,
-          "side": 5,
-          "layer": 22,
-          "point": 20
-        },
-        {
-          "normalizedX": -137,
-          "normalizedY": 225,
-          "originalContractX": 2147483509,
-          "originalContractY": 2147483871,
-          "side": 2,
-          "layer": 23,
-          "point": 21
-        },
-        {
           "normalizedX": -122,
           "normalizedY": 195,
           "originalContractX": 2147483524,
@@ -21263,15 +21236,6 @@
           "side": 2,
           "layer": 20,
           "point": 18
-        },
-        {
-          "normalizedX": -137,
-          "normalizedY": 205,
-          "originalContractX": 2147483509,
-          "originalContractY": 2147483851,
-          "side": 2,
-          "layer": 22,
-          "point": 19
         },
         {
           "normalizedX": -80,
@@ -21290,33 +21254,6 @@
           "side": 5,
           "layer": 21,
           "point": 18
-        },
-        {
-          "normalizedX": -100,
-          "normalizedY": 250,
-          "originalContractX": 2147483546,
-          "originalContractY": 2147483896,
-          "side": 5,
-          "layer": 23,
-          "point": 21
-        },
-        {
-          "normalizedX": -85,
-          "normalizedY": 240,
-          "originalContractX": 2147483561,
-          "originalContractY": 2147483886,
-          "side": 5,
-          "layer": 22,
-          "point": 19
-        },
-        {
-          "normalizedX": -142,
-          "normalizedY": 215,
-          "originalContractX": 2147483504,
-          "originalContractY": 2147483861,
-          "side": 2,
-          "layer": 23,
-          "point": 20
         },
         {
           "normalizedX": -132,
@@ -21346,15 +21283,6 @@
           "point": 17
         },
         {
-          "normalizedX": -90,
-          "normalizedY": 250,
-          "originalContractX": 2147483556,
-          "originalContractY": 2147483896,
-          "side": 5,
-          "layer": 23,
-          "point": 20
-        },
-        {
           "normalizedX": -127,
           "normalizedY": 185,
           "originalContractX": 2147483519,
@@ -21364,15 +21292,6 @@
           "point": 17
         },
         {
-          "normalizedX": -147,
-          "normalizedY": 205,
-          "originalContractX": 2147483499,
-          "originalContractY": 2147483851,
-          "side": 2,
-          "layer": 23,
-          "point": 19
-        },
-        {
           "normalizedX": -75,
           "normalizedY": 200,
           "originalContractX": 2147483571,
@@ -21380,24 +21299,6 @@
           "side": 5,
           "layer": 18,
           "point": 16
-        },
-        {
-          "normalizedX": -75,
-          "normalizedY": 240,
-          "originalContractX": 2147483571,
-          "originalContractY": 2147483886,
-          "side": 5,
-          "layer": 22,
-          "point": 18
-        },
-        {
-          "normalizedX": -142,
-          "normalizedY": 195,
-          "originalContractX": 2147483504,
-          "originalContractY": 2147483841,
-          "side": 2,
-          "layer": 22,
-          "point": 18
         },
         {
           "normalizedX": -70,
@@ -21416,15 +21317,6 @@
           "side": 5,
           "layer": 21,
           "point": 17
-        },
-        {
-          "normalizedX": -80,
-          "normalizedY": 250,
-          "originalContractX": 2147483566,
-          "originalContractY": 2147483896,
-          "side": 5,
-          "layer": 23,
-          "point": 19
         },
         {
           "normalizedX": -137,
@@ -21463,15 +21355,6 @@
           "point": 16
         },
         {
-          "normalizedX": -152,
-          "normalizedY": 195,
-          "originalContractX": 2147483494,
-          "originalContractY": 2147483841,
-          "side": 2,
-          "layer": 23,
-          "point": 18
-        },
-        {
           "normalizedX": -65,
           "normalizedY": 200,
           "originalContractX": 2147483581,
@@ -21479,15 +21362,6 @@
           "side": 5,
           "layer": 18,
           "point": 15
-        },
-        {
-          "normalizedX": -65,
-          "normalizedY": 240,
-          "originalContractX": 2147483581,
-          "originalContractY": 2147483886,
-          "side": 5,
-          "layer": 22,
-          "point": 17
         },
         {
           "normalizedX": -70,
@@ -21499,15 +21373,6 @@
           "point": 15
         },
         {
-          "normalizedX": -70,
-          "normalizedY": 250,
-          "originalContractX": 2147483576,
-          "originalContractY": 2147483896,
-          "side": 5,
-          "layer": 23,
-          "point": 18
-        },
-        {
           "normalizedX": -132,
           "normalizedY": 175,
           "originalContractX": 2147483514,
@@ -21515,15 +21380,6 @@
           "side": 2,
           "layer": 20,
           "point": 16
-        },
-        {
-          "normalizedX": -147,
-          "normalizedY": 185,
-          "originalContractX": 2147483499,
-          "originalContractY": 2147483831,
-          "side": 2,
-          "layer": 22,
-          "point": 17
         },
         {
           "normalizedX": -60,
@@ -21598,15 +21454,6 @@
           "point": 14
         },
         {
-          "normalizedX": -60,
-          "normalizedY": 250,
-          "originalContractX": 2147483586,
-          "originalContractY": 2147483896,
-          "side": 5,
-          "layer": 23,
-          "point": 17
-        },
-        {
           "normalizedX": -55,
           "normalizedY": 200,
           "originalContractX": 2147483591,
@@ -21614,24 +21461,6 @@
           "side": 5,
           "layer": 18,
           "point": 14
-        },
-        {
-          "normalizedX": -55,
-          "normalizedY": 240,
-          "originalContractX": 2147483591,
-          "originalContractY": 2147483886,
-          "side": 5,
-          "layer": 22,
-          "point": 16
-        },
-        {
-          "normalizedX": -157,
-          "normalizedY": 185,
-          "originalContractX": 2147483489,
-          "originalContractY": 2147483831,
-          "side": 2,
-          "layer": 23,
-          "point": 17
         },
         {
           "normalizedX": -65,
@@ -21650,14 +21479,230 @@
           "side": 5,
           "layer": 19,
           "point": 14
+        },
+        {
+          "normalizedX": -50,
+          "normalizedY": 230,
+          "originalContractX": 2147483596,
+          "originalContractY": 2147483876,
+          "side": 5,
+          "layer": 21,
+          "point": 15
+        },
+        {
+          "normalizedX": -137,
+          "normalizedY": 165,
+          "originalContractX": 2147483509,
+          "originalContractY": 2147483811,
+          "side": 2,
+          "layer": 20,
+          "point": 15
+        },
+        {
+          "normalizedX": -45,
+          "normalizedY": 220,
+          "originalContractX": 2147483601,
+          "originalContractY": 2147483866,
+          "side": 5,
+          "layer": 20,
+          "point": 14
+        },
+        {
+          "normalizedX": -112,
+          "normalizedY": 155,
+          "originalContractX": 2147483534,
+          "originalContractY": 2147483801,
+          "side": 2,
+          "layer": 17,
+          "point": 14
+        },
+        {
+          "normalizedX": -102,
+          "normalizedY": 155,
+          "originalContractX": 2147483544,
+          "originalContractY": 2147483801,
+          "side": 2,
+          "layer": 16,
+          "point": 14
+        },
+        {
+          "normalizedX": -122,
+          "normalizedY": 155,
+          "originalContractX": 2147483524,
+          "originalContractY": 2147483801,
+          "side": 2,
+          "layer": 18,
+          "point": 14
+        },
+        {
+          "normalizedX": -147,
+          "normalizedY": 165,
+          "originalContractX": 2147483499,
+          "originalContractY": 2147483811,
+          "side": 2,
+          "layer": 21,
+          "point": 15
+        },
+        {
+          "normalizedX": -50,
+          "normalizedY": 190,
+          "originalContractX": 2147483596,
+          "originalContractY": 2147483836,
+          "side": 5,
+          "layer": 17,
+          "point": 13
+        },
+        {
+          "normalizedX": -55,
+          "normalizedY": 180,
+          "originalContractX": 2147483591,
+          "originalContractY": 2147483826,
+          "side": 5,
+          "layer": 16,
+          "point": 13
+        },
+        {
+          "normalizedX": -45,
+          "normalizedY": 200,
+          "originalContractX": 2147483601,
+          "originalContractY": 2147483846,
+          "side": 5,
+          "layer": 18,
+          "point": 13
+        },
+        {
+          "normalizedX": -132,
+          "normalizedY": 155,
+          "originalContractX": 2147483514,
+          "originalContractY": 2147483801,
+          "side": 2,
+          "layer": 19,
+          "point": 14
+        },
+        {
+          "normalizedX": -60,
+          "normalizedY": 170,
+          "originalContractX": 2147483586,
+          "originalContractY": 2147483816,
+          "side": 5,
+          "layer": 15,
+          "point": 13
+        },
+        {
+          "normalizedX": -40,
+          "normalizedY": 210,
+          "originalContractX": 2147483606,
+          "originalContractY": 2147483856,
+          "side": 5,
+          "layer": 19,
+          "point": 13
+        },
+        {
+          "normalizedX": -40,
+          "normalizedY": 230,
+          "originalContractX": 2147483606,
+          "originalContractY": 2147483876,
+          "side": 5,
+          "layer": 21,
+          "point": 14
+        },
+        {
+          "normalizedX": -142,
+          "normalizedY": 155,
+          "originalContractX": 2147483504,
+          "originalContractY": 2147483801,
+          "side": 2,
+          "layer": 20,
+          "point": 14
+        },
+        {
+          "normalizedX": -35,
+          "normalizedY": 220,
+          "originalContractX": 2147483611,
+          "originalContractY": 2147483866,
+          "side": 5,
+          "layer": 20,
+          "point": 13
+        },
+        {
+          "normalizedX": -107,
+          "normalizedY": 145,
+          "originalContractX": 2147483539,
+          "originalContractY": 2147483791,
+          "side": 2,
+          "layer": 16,
+          "point": 13
+        },
+        {
+          "normalizedX": -117,
+          "normalizedY": 145,
+          "originalContractX": 2147483529,
+          "originalContractY": 2147483791,
+          "side": 2,
+          "layer": 17,
+          "point": 13
+        },
+        {
+          "normalizedX": -97,
+          "normalizedY": 145,
+          "originalContractX": 2147483549,
+          "originalContractY": 2147483791,
+          "side": 2,
+          "layer": 15,
+          "point": 13
         }
       ]
     },
     {
       "zoneId": 8,
-      "name": "Zone 8 (Bank 2)",
+      "name": "Zone 8",
       "locations": [
         {
+          "normalizedX": 213,
+          "normalizedY": 15,
+          "originalContractX": 2147483859,
+          "originalContractY": 2147483661,
+          "side": 0,
+          "layer": 20,
+          "point": 0
+        },
+        {
+          "normalizedX": 203,
+          "normalizedY": 15,
+          "originalContractX": 2147483849,
+          "originalContractY": 2147483661,
+          "side": 0,
+          "layer": 19,
+          "point": 0
+        },
+        {
+          "normalizedX": 203,
+          "normalizedY": -15,
+          "originalContractX": 2147483849,
+          "originalContractY": 2147483631,
+          "side": 1,
+          "layer": 19,
+          "point": 0
+        },
+        {
+          "normalizedX": 208,
+          "normalizedY": 25,
+          "originalContractX": 2147483854,
+          "originalContractY": 2147483671,
+          "side": 0,
+          "layer": 20,
+          "point": 1
+        },
+        {
+          "normalizedX": 208,
+          "normalizedY": -25,
+          "originalContractX": 2147483854,
+          "originalContractY": 2147483621,
+          "side": 1,
+          "layer": 20,
+          "point": 1
+        },
+        {
           "normalizedX": 193,
           "normalizedY": 15,
           "originalContractX": 2147483839,
@@ -21674,6 +21719,42 @@
           "side": 1,
           "layer": 18,
           "point": 0
+        },
+        {
+          "normalizedX": 198,
+          "normalizedY": 25,
+          "originalContractX": 2147483844,
+          "originalContractY": 2147483671,
+          "side": 0,
+          "layer": 19,
+          "point": 1
+        },
+        {
+          "normalizedX": 198,
+          "normalizedY": -25,
+          "originalContractX": 2147483844,
+          "originalContractY": 2147483621,
+          "side": 1,
+          "layer": 19,
+          "point": 1
+        },
+        {
+          "normalizedX": 203,
+          "normalizedY": 35,
+          "originalContractX": 2147483849,
+          "originalContractY": 2147483681,
+          "side": 0,
+          "layer": 20,
+          "point": 2
+        },
+        {
+          "normalizedX": 203,
+          "normalizedY": -35,
+          "originalContractX": 2147483849,
+          "originalContractY": 2147483611,
+          "side": 1,
+          "layer": 20,
+          "point": 2
         },
         {
           "normalizedX": 183,
@@ -21712,6 +21793,24 @@
           "point": 1
         },
         {
+          "normalizedX": 193,
+          "normalizedY": 35,
+          "originalContractX": 2147483839,
+          "originalContractY": 2147483681,
+          "side": 0,
+          "layer": 19,
+          "point": 2
+        },
+        {
+          "normalizedX": 193,
+          "normalizedY": -35,
+          "originalContractX": 2147483839,
+          "originalContractY": 2147483611,
+          "side": 1,
+          "layer": 19,
+          "point": 2
+        },
+        {
           "normalizedX": 178,
           "normalizedY": 25,
           "originalContractX": 2147483824,
@@ -21748,6 +21847,24 @@
           "point": 0
         },
         {
+          "normalizedX": 198,
+          "normalizedY": 45,
+          "originalContractX": 2147483844,
+          "originalContractY": 2147483691,
+          "side": 0,
+          "layer": 20,
+          "point": 3
+        },
+        {
+          "normalizedX": 198,
+          "normalizedY": -45,
+          "originalContractX": 2147483844,
+          "originalContractY": 2147483601,
+          "side": 1,
+          "layer": 20,
+          "point": 3
+        },
+        {
           "normalizedX": 183,
           "normalizedY": 35,
           "originalContractX": 2147483829,
@@ -21764,6 +21881,24 @@
           "side": 1,
           "layer": 18,
           "point": 2
+        },
+        {
+          "normalizedX": 188,
+          "normalizedY": 45,
+          "originalContractX": 2147483834,
+          "originalContractY": 2147483691,
+          "side": 0,
+          "layer": 19,
+          "point": 3
+        },
+        {
+          "normalizedX": 188,
+          "normalizedY": -45,
+          "originalContractX": 2147483834,
+          "originalContractY": 2147483601,
+          "side": 1,
+          "layer": 19,
+          "point": 3
         },
         {
           "normalizedX": 168,
@@ -21820,6 +21955,24 @@
           "point": 0
         },
         {
+          "normalizedX": 193,
+          "normalizedY": 55,
+          "originalContractX": 2147483839,
+          "originalContractY": 2147483701,
+          "side": 0,
+          "layer": 20,
+          "point": 4
+        },
+        {
+          "normalizedX": 193,
+          "normalizedY": -55,
+          "originalContractX": 2147483839,
+          "originalContractY": 2147483591,
+          "side": 1,
+          "layer": 20,
+          "point": 4
+        },
+        {
           "normalizedX": 178,
           "normalizedY": 45,
           "originalContractX": 2147483824,
@@ -21836,6 +21989,24 @@
           "side": 1,
           "layer": 18,
           "point": 3
+        },
+        {
+          "normalizedX": 183,
+          "normalizedY": 55,
+          "originalContractX": 2147483829,
+          "originalContractY": 2147483701,
+          "side": 0,
+          "layer": 19,
+          "point": 4
+        },
+        {
+          "normalizedX": 183,
+          "normalizedY": -55,
+          "originalContractX": 2147483829,
+          "originalContractY": 2147483591,
+          "side": 1,
+          "layer": 19,
+          "point": 4
         },
         {
           "normalizedX": 158,
@@ -21910,208 +22081,37 @@
           "point": 4
         },
         {
+          "normalizedX": 188,
+          "normalizedY": 65,
+          "originalContractX": 2147483834,
+          "originalContractY": 2147483711,
+          "side": 0,
+          "layer": 20,
+          "point": 5
+        },
+        {
+          "normalizedX": 188,
+          "normalizedY": -65,
+          "originalContractX": 2147483834,
+          "originalContractY": 2147483581,
+          "side": 1,
+          "layer": 20,
+          "point": 5
+        },
+        {
           "normalizedX": 153,
           "normalizedY": -35,
           "originalContractX": 2147483799,
           "originalContractY": 2147483611,
           "side": 1,
           "layer": 15,
-          "point": 2
-        },
-        {
-          "normalizedX": 148,
-          "normalizedY": 25,
-          "originalContractX": 2147483794,
-          "originalContractY": 2147483671,
-          "side": 0,
-          "layer": 14,
-          "point": 1
-        },
-        {
-          "normalizedX": 148,
-          "normalizedY": -25,
-          "originalContractX": 2147483794,
-          "originalContractY": 2147483621,
-          "side": 1,
-          "layer": 14,
-          "point": 1
-        },
-        {
-          "normalizedX": 158,
-          "normalizedY": 45,
-          "originalContractX": 2147483804,
-          "originalContractY": 2147483691,
-          "side": 0,
-          "layer": 16,
-          "point": 3
-        },
-        {
-          "normalizedX": 158,
-          "normalizedY": -45,
-          "originalContractX": 2147483804,
-          "originalContractY": 2147483601,
-          "side": 1,
-          "layer": 16,
-          "point": 3
-        },
-        {
-          "normalizedX": 143,
-          "normalizedY": 15,
-          "originalContractX": 2147483789,
-          "originalContractY": 2147483661,
-          "side": 0,
-          "layer": 13,
-          "point": 0
-        },
-        {
-          "normalizedX": 163,
-          "normalizedY": 55,
-          "originalContractX": 2147483809,
-          "originalContractY": 2147483701,
-          "side": 0,
-          "layer": 17,
-          "point": 4
-        },
-        {
-          "normalizedX": 163,
-          "normalizedY": -55,
-          "originalContractX": 2147483809,
-          "originalContractY": 2147483591,
-          "side": 1,
-          "layer": 17,
-          "point": 4
-        },
-        {
-          "normalizedX": 168,
-          "normalizedY": 65,
-          "originalContractX": 2147483814,
-          "originalContractY": 2147483711,
-          "side": 0,
-          "layer": 18,
-          "point": 5
-        },
-        {
-          "normalizedX": 168,
-          "normalizedY": -65,
-          "originalContractX": 2147483814,
-          "originalContractY": 2147483581,
-          "side": 1,
-          "layer": 18,
-          "point": 5
-        },
-        {
-          "normalizedX": 143,
-          "normalizedY": 35,
-          "originalContractX": 2147483789,
-          "originalContractY": 2147483681,
-          "side": 0,
-          "layer": 14,
-          "point": 2
-        },
-        {
-          "normalizedX": 148,
-          "normalizedY": 45,
-          "originalContractX": 2147483794,
-          "originalContractY": 2147483691,
-          "side": 0,
-          "layer": 15,
-          "point": 3
-        },
-        {
-          "normalizedX": 148,
-          "normalizedY": -45,
-          "originalContractX": 2147483794,
-          "originalContractY": 2147483601,
-          "side": 1,
-          "layer": 15,
-          "point": 3
-        },
-        {
-          "normalizedX": 138,
-          "normalizedY": 25,
-          "originalContractX": 2147483784,
-          "originalContractY": 2147483671,
-          "side": 0,
-          "layer": 13,
-          "point": 1
-        },
-        {
-          "normalizedX": 153,
-          "normalizedY": 55,
-          "originalContractX": 2147483799,
-          "originalContractY": 2147483701,
-          "side": 0,
-          "layer": 16,
-          "point": 4
-        },
-        {
-          "normalizedX": 153,
-          "normalizedY": -55,
-          "originalContractX": 2147483799,
-          "originalContractY": 2147483591,
-          "side": 1,
-          "layer": 16,
-          "point": 4
-        },
-        {
-          "normalizedX": 158,
-          "normalizedY": 65,
-          "originalContractX": 2147483804,
-          "originalContractY": 2147483711,
-          "side": 0,
-          "layer": 17,
-          "point": 5
-        },
-        {
-          "normalizedX": 158,
-          "normalizedY": -65,
-          "originalContractX": 2147483804,
-          "originalContractY": 2147483581,
-          "side": 1,
-          "layer": 17,
-          "point": 5
-        },
-        {
-          "normalizedX": 138,
-          "normalizedY": 45,
-          "originalContractX": 2147483784,
-          "originalContractY": 2147483691,
-          "side": 0,
-          "layer": 14,
-          "point": 3
-        },
-        {
-          "normalizedX": 138,
-          "normalizedY": -45,
-          "originalContractX": 2147483784,
-          "originalContractY": 2147483601,
-          "side": 1,
-          "layer": 14,
-          "point": 3
-        },
-        {
-          "normalizedX": 133,
-          "normalizedY": 35,
-          "originalContractX": 2147483779,
-          "originalContractY": 2147483681,
-          "side": 0,
-          "layer": 13,
-          "point": 2
-        },
-        {
-          "normalizedX": 133,
-          "normalizedY": -35,
-          "originalContractX": 2147483779,
-          "originalContractY": 2147483611,
-          "side": 1,
-          "layer": 13,
           "point": 2
         }
       ]
     },
     {
       "zoneId": 9,
-      "name": "Zone 9 (Bank 3)",
+      "name": "Zone 9",
       "locations": [
         {
           "normalizedX": 90,
@@ -22567,7 +22567,7 @@
     },
     {
       "zoneId": 10,
-      "name": "Zone 10 (Bank 4)",
+      "name": "Zone 10",
       "locations": [
         {
           "normalizedX": -90,
@@ -22577,15 +22577,6 @@
           "side": 4,
           "layer": 21,
           "point": 19
-        },
-        {
-          "normalizedX": -132,
-          "normalizedY": -215,
-          "originalContractX": 2147483514,
-          "originalContractY": 2147483431,
-          "side": 3,
-          "layer": 22,
-          "point": 20
         },
         {
           "normalizedX": -127,
@@ -22606,24 +22597,6 @@
           "point": 18
         },
         {
-          "normalizedX": -95,
-          "normalizedY": -240,
-          "originalContractX": 2147483551,
-          "originalContractY": 2147483406,
-          "side": 4,
-          "layer": 22,
-          "point": 20
-        },
-        {
-          "normalizedX": -137,
-          "normalizedY": -225,
-          "originalContractX": 2147483509,
-          "originalContractY": 2147483421,
-          "side": 3,
-          "layer": 23,
-          "point": 21
-        },
-        {
           "normalizedX": -122,
           "normalizedY": -195,
           "originalContractX": 2147483524,
@@ -22631,15 +22604,6 @@
           "side": 3,
           "layer": 20,
           "point": 18
-        },
-        {
-          "normalizedX": -137,
-          "normalizedY": -205,
-          "originalContractX": 2147483509,
-          "originalContractY": 2147483441,
-          "side": 3,
-          "layer": 22,
-          "point": 19
         },
         {
           "normalizedX": -80,
@@ -22658,33 +22622,6 @@
           "side": 4,
           "layer": 21,
           "point": 18
-        },
-        {
-          "normalizedX": -100,
-          "normalizedY": -250,
-          "originalContractX": 2147483546,
-          "originalContractY": 2147483396,
-          "side": 4,
-          "layer": 23,
-          "point": 21
-        },
-        {
-          "normalizedX": -85,
-          "normalizedY": -240,
-          "originalContractX": 2147483561,
-          "originalContractY": 2147483406,
-          "side": 4,
-          "layer": 22,
-          "point": 19
-        },
-        {
-          "normalizedX": -142,
-          "normalizedY": -215,
-          "originalContractX": 2147483504,
-          "originalContractY": 2147483431,
-          "side": 3,
-          "layer": 23,
-          "point": 20
         },
         {
           "normalizedX": -132,
@@ -22705,15 +22642,6 @@
           "point": 17
         },
         {
-          "normalizedX": -90,
-          "normalizedY": -250,
-          "originalContractX": 2147483556,
-          "originalContractY": 2147483396,
-          "side": 4,
-          "layer": 23,
-          "point": 20
-        },
-        {
           "normalizedX": -127,
           "normalizedY": -185,
           "originalContractX": 2147483519,
@@ -22723,15 +22651,6 @@
           "point": 17
         },
         {
-          "normalizedX": -147,
-          "normalizedY": -205,
-          "originalContractX": 2147483499,
-          "originalContractY": 2147483441,
-          "side": 3,
-          "layer": 23,
-          "point": 19
-        },
-        {
           "normalizedX": -75,
           "normalizedY": -200,
           "originalContractX": 2147483571,
@@ -22739,24 +22658,6 @@
           "side": 4,
           "layer": 18,
           "point": 16
-        },
-        {
-          "normalizedX": -75,
-          "normalizedY": -240,
-          "originalContractX": 2147483571,
-          "originalContractY": 2147483406,
-          "side": 4,
-          "layer": 22,
-          "point": 18
-        },
-        {
-          "normalizedX": -142,
-          "normalizedY": -195,
-          "originalContractX": 2147483504,
-          "originalContractY": 2147483451,
-          "side": 3,
-          "layer": 22,
-          "point": 18
         },
         {
           "normalizedX": -70,
@@ -22775,15 +22676,6 @@
           "side": 4,
           "layer": 21,
           "point": 17
-        },
-        {
-          "normalizedX": -80,
-          "normalizedY": -250,
-          "originalContractX": 2147483566,
-          "originalContractY": 2147483396,
-          "side": 4,
-          "layer": 23,
-          "point": 19
         },
         {
           "normalizedX": -137,
@@ -22822,15 +22714,6 @@
           "point": 16
         },
         {
-          "normalizedX": -152,
-          "normalizedY": -195,
-          "originalContractX": 2147483494,
-          "originalContractY": 2147483451,
-          "side": 3,
-          "layer": 23,
-          "point": 18
-        },
-        {
           "normalizedX": -65,
           "normalizedY": -200,
           "originalContractX": 2147483581,
@@ -22838,15 +22721,6 @@
           "side": 4,
           "layer": 18,
           "point": 15
-        },
-        {
-          "normalizedX": -65,
-          "normalizedY": -240,
-          "originalContractX": 2147483581,
-          "originalContractY": 2147483406,
-          "side": 4,
-          "layer": 22,
-          "point": 17
         },
         {
           "normalizedX": -70,
@@ -22858,15 +22732,6 @@
           "point": 15
         },
         {
-          "normalizedX": -70,
-          "normalizedY": -250,
-          "originalContractX": 2147483576,
-          "originalContractY": 2147483396,
-          "side": 4,
-          "layer": 23,
-          "point": 18
-        },
-        {
           "normalizedX": -132,
           "normalizedY": -175,
           "originalContractX": 2147483514,
@@ -22874,15 +22739,6 @@
           "side": 3,
           "layer": 20,
           "point": 16
-        },
-        {
-          "normalizedX": -147,
-          "normalizedY": -185,
-          "originalContractX": 2147483499,
-          "originalContractY": 2147483461,
-          "side": 3,
-          "layer": 22,
-          "point": 17
         },
         {
           "normalizedX": -60,
@@ -22957,15 +22813,6 @@
           "point": 14
         },
         {
-          "normalizedX": -60,
-          "normalizedY": -250,
-          "originalContractX": 2147483586,
-          "originalContractY": 2147483396,
-          "side": 4,
-          "layer": 23,
-          "point": 17
-        },
-        {
           "normalizedX": -55,
           "normalizedY": -200,
           "originalContractX": 2147483591,
@@ -22973,24 +22820,6 @@
           "side": 4,
           "layer": 18,
           "point": 14
-        },
-        {
-          "normalizedX": -55,
-          "normalizedY": -240,
-          "originalContractX": 2147483591,
-          "originalContractY": 2147483406,
-          "side": 4,
-          "layer": 22,
-          "point": 16
-        },
-        {
-          "normalizedX": -157,
-          "normalizedY": -185,
-          "originalContractX": 2147483489,
-          "originalContractY": 2147483461,
-          "side": 3,
-          "layer": 23,
-          "point": 17
         },
         {
           "normalizedX": -65,
@@ -23018,14 +22847,239 @@
           "side": 4,
           "layer": 21,
           "point": 15
+        },
+        {
+          "normalizedX": -137,
+          "normalizedY": -165,
+          "originalContractX": 2147483509,
+          "originalContractY": 2147483481,
+          "side": 3,
+          "layer": 20,
+          "point": 15
+        },
+        {
+          "normalizedX": -45,
+          "normalizedY": -220,
+          "originalContractX": 2147483601,
+          "originalContractY": 2147483426,
+          "side": 4,
+          "layer": 20,
+          "point": 14
+        },
+        {
+          "normalizedX": -112,
+          "normalizedY": -155,
+          "originalContractX": 2147483534,
+          "originalContractY": 2147483491,
+          "side": 3,
+          "layer": 17,
+          "point": 14
+        },
+        {
+          "normalizedX": -102,
+          "normalizedY": -155,
+          "originalContractX": 2147483544,
+          "originalContractY": 2147483491,
+          "side": 3,
+          "layer": 16,
+          "point": 14
+        },
+        {
+          "normalizedX": -122,
+          "normalizedY": -155,
+          "originalContractX": 2147483524,
+          "originalContractY": 2147483491,
+          "side": 3,
+          "layer": 18,
+          "point": 14
+        },
+        {
+          "normalizedX": -147,
+          "normalizedY": -165,
+          "originalContractX": 2147483499,
+          "originalContractY": 2147483481,
+          "side": 3,
+          "layer": 21,
+          "point": 15
+        },
+        {
+          "normalizedX": -50,
+          "normalizedY": -190,
+          "originalContractX": 2147483596,
+          "originalContractY": 2147483456,
+          "side": 4,
+          "layer": 17,
+          "point": 13
+        },
+        {
+          "normalizedX": -55,
+          "normalizedY": -180,
+          "originalContractX": 2147483591,
+          "originalContractY": 2147483466,
+          "side": 4,
+          "layer": 16,
+          "point": 13
+        },
+        {
+          "normalizedX": -45,
+          "normalizedY": -200,
+          "originalContractX": 2147483601,
+          "originalContractY": 2147483446,
+          "side": 4,
+          "layer": 18,
+          "point": 13
+        },
+        {
+          "normalizedX": -132,
+          "normalizedY": -155,
+          "originalContractX": 2147483514,
+          "originalContractY": 2147483491,
+          "side": 3,
+          "layer": 19,
+          "point": 14
+        },
+        {
+          "normalizedX": -60,
+          "normalizedY": -170,
+          "originalContractX": 2147483586,
+          "originalContractY": 2147483476,
+          "side": 4,
+          "layer": 15,
+          "point": 13
+        },
+        {
+          "normalizedX": -40,
+          "normalizedY": -210,
+          "originalContractX": 2147483606,
+          "originalContractY": 2147483436,
+          "side": 4,
+          "layer": 19,
+          "point": 13
+        },
+        {
+          "normalizedX": -40,
+          "normalizedY": -230,
+          "originalContractX": 2147483606,
+          "originalContractY": 2147483416,
+          "side": 4,
+          "layer": 21,
+          "point": 14
+        },
+        {
+          "normalizedX": -142,
+          "normalizedY": -155,
+          "originalContractX": 2147483504,
+          "originalContractY": 2147483491,
+          "side": 3,
+          "layer": 20,
+          "point": 14
+        },
+        {
+          "normalizedX": -35,
+          "normalizedY": -220,
+          "originalContractX": 2147483611,
+          "originalContractY": 2147483426,
+          "side": 4,
+          "layer": 20,
+          "point": 13
+        },
+        {
+          "normalizedX": -107,
+          "normalizedY": -145,
+          "originalContractX": 2147483539,
+          "originalContractY": 2147483501,
+          "side": 3,
+          "layer": 16,
+          "point": 13
+        },
+        {
+          "normalizedX": -117,
+          "normalizedY": -145,
+          "originalContractX": 2147483529,
+          "originalContractY": 2147483501,
+          "side": 3,
+          "layer": 17,
+          "point": 13
+        },
+        {
+          "normalizedX": -97,
+          "normalizedY": -145,
+          "originalContractX": 2147483549,
+          "originalContractY": 2147483501,
+          "side": 3,
+          "layer": 15,
+          "point": 13
+        },
+        {
+          "normalizedX": -40,
+          "normalizedY": -190,
+          "originalContractX": 2147483606,
+          "originalContractY": 2147483456,
+          "side": 4,
+          "layer": 17,
+          "point": 12
         }
       ]
     },
     {
       "zoneId": 11,
-      "name": "Zone 11 (Bank 5)",
+      "name": "Zone 11",
       "locations": [
         {
+          "normalizedX": -212,
+          "normalizedY": 15,
+          "originalContractX": 2147483434,
+          "originalContractY": 2147483661,
+          "side": 2,
+          "layer": 20,
+          "point": 0
+        },
+        {
+          "normalizedX": -212,
+          "normalizedY": -15,
+          "originalContractX": 2147483434,
+          "originalContractY": 2147483631,
+          "side": 3,
+          "layer": 20,
+          "point": 0
+        },
+        {
+          "normalizedX": -202,
+          "normalizedY": 15,
+          "originalContractX": 2147483444,
+          "originalContractY": 2147483661,
+          "side": 2,
+          "layer": 19,
+          "point": 0
+        },
+        {
+          "normalizedX": -202,
+          "normalizedY": -15,
+          "originalContractX": 2147483444,
+          "originalContractY": 2147483631,
+          "side": 3,
+          "layer": 19,
+          "point": 0
+        },
+        {
+          "normalizedX": -207,
+          "normalizedY": 25,
+          "originalContractX": 2147483439,
+          "originalContractY": 2147483671,
+          "side": 2,
+          "layer": 20,
+          "point": 1
+        },
+        {
+          "normalizedX": -207,
+          "normalizedY": -25,
+          "originalContractX": 2147483439,
+          "originalContractY": 2147483621,
+          "side": 3,
+          "layer": 20,
+          "point": 1
+        },
+        {
           "normalizedX": -192,
           "normalizedY": 15,
           "originalContractX": 2147483454,
@@ -23042,6 +23096,42 @@
           "side": 3,
           "layer": 18,
           "point": 0
+        },
+        {
+          "normalizedX": -197,
+          "normalizedY": 25,
+          "originalContractX": 2147483449,
+          "originalContractY": 2147483671,
+          "side": 2,
+          "layer": 19,
+          "point": 1
+        },
+        {
+          "normalizedX": -197,
+          "normalizedY": -25,
+          "originalContractX": 2147483449,
+          "originalContractY": 2147483621,
+          "side": 3,
+          "layer": 19,
+          "point": 1
+        },
+        {
+          "normalizedX": -202,
+          "normalizedY": 35,
+          "originalContractX": 2147483444,
+          "originalContractY": 2147483681,
+          "side": 2,
+          "layer": 20,
+          "point": 2
+        },
+        {
+          "normalizedX": -202,
+          "normalizedY": -35,
+          "originalContractX": 2147483444,
+          "originalContractY": 2147483611,
+          "side": 3,
+          "layer": 20,
+          "point": 2
         },
         {
           "normalizedX": -182,
@@ -23080,6 +23170,24 @@
           "point": 1
         },
         {
+          "normalizedX": -192,
+          "normalizedY": 35,
+          "originalContractX": 2147483454,
+          "originalContractY": 2147483681,
+          "side": 2,
+          "layer": 19,
+          "point": 2
+        },
+        {
+          "normalizedX": -192,
+          "normalizedY": -35,
+          "originalContractX": 2147483454,
+          "originalContractY": 2147483611,
+          "side": 3,
+          "layer": 19,
+          "point": 2
+        },
+        {
           "normalizedX": -177,
           "normalizedY": 25,
           "originalContractX": 2147483469,
@@ -23114,6 +23222,24 @@
           "side": 3,
           "layer": 16,
           "point": 0
+        },
+        {
+          "normalizedX": -197,
+          "normalizedY": 45,
+          "originalContractX": 2147483449,
+          "originalContractY": 2147483691,
+          "side": 2,
+          "layer": 20,
+          "point": 3
+        },
+        {
+          "normalizedX": -197,
+          "normalizedY": -45,
+          "originalContractX": 2147483449,
+          "originalContractY": 2147483601,
+          "side": 3,
+          "layer": 20,
+          "point": 3
         },
         {
           "normalizedX": -182,
@@ -23134,6 +23260,24 @@
           "point": 2
         },
         {
+          "normalizedX": -187,
+          "normalizedY": 45,
+          "originalContractX": 2147483459,
+          "originalContractY": 2147483691,
+          "side": 2,
+          "layer": 19,
+          "point": 3
+        },
+        {
+          "normalizedX": -187,
+          "normalizedY": -45,
+          "originalContractX": 2147483459,
+          "originalContractY": 2147483601,
+          "side": 3,
+          "layer": 19,
+          "point": 3
+        },
+        {
           "normalizedX": -167,
           "normalizedY": 25,
           "originalContractX": 2147483479,
@@ -23188,6 +23332,24 @@
           "point": 0
         },
         {
+          "normalizedX": -192,
+          "normalizedY": 55,
+          "originalContractX": 2147483454,
+          "originalContractY": 2147483701,
+          "side": 2,
+          "layer": 20,
+          "point": 4
+        },
+        {
+          "normalizedX": -192,
+          "normalizedY": -55,
+          "originalContractX": 2147483454,
+          "originalContractY": 2147483591,
+          "side": 3,
+          "layer": 20,
+          "point": 4
+        },
+        {
           "normalizedX": -177,
           "normalizedY": 45,
           "originalContractX": 2147483469,
@@ -23204,6 +23366,24 @@
           "side": 3,
           "layer": 18,
           "point": 3
+        },
+        {
+          "normalizedX": -182,
+          "normalizedY": 55,
+          "originalContractX": 2147483464,
+          "originalContractY": 2147483701,
+          "side": 2,
+          "layer": 19,
+          "point": 4
+        },
+        {
+          "normalizedX": -182,
+          "normalizedY": -55,
+          "originalContractX": 2147483464,
+          "originalContractY": 2147483591,
+          "side": 3,
+          "layer": 19,
+          "point": 4
         },
         {
           "normalizedX": -162,
@@ -23278,208 +23458,28 @@
           "point": 0
         },
         {
-          "normalizedX": -172,
-          "normalizedY": 55,
-          "originalContractX": 2147483474,
-          "originalContractY": 2147483701,
-          "side": 2,
-          "layer": 18,
-          "point": 4
-        },
-        {
-          "normalizedX": -172,
-          "normalizedY": -55,
-          "originalContractX": 2147483474,
-          "originalContractY": 2147483591,
-          "side": 3,
-          "layer": 18,
-          "point": 4
-        },
-        {
-          "normalizedX": -152,
-          "normalizedY": 35,
-          "originalContractX": 2147483494,
-          "originalContractY": 2147483681,
-          "side": 2,
-          "layer": 15,
-          "point": 2
-        },
-        {
-          "normalizedX": -147,
-          "normalizedY": 25,
-          "originalContractX": 2147483499,
-          "originalContractY": 2147483671,
-          "side": 2,
-          "layer": 14,
-          "point": 1
-        },
-        {
-          "normalizedX": -157,
-          "normalizedY": 45,
-          "originalContractX": 2147483489,
-          "originalContractY": 2147483691,
-          "side": 2,
-          "layer": 16,
-          "point": 3
-        },
-        {
-          "normalizedX": -157,
-          "normalizedY": -45,
-          "originalContractX": 2147483489,
-          "originalContractY": 2147483601,
-          "side": 3,
-          "layer": 16,
-          "point": 3
-        },
-        {
-          "normalizedX": -162,
-          "normalizedY": 55,
-          "originalContractX": 2147483484,
-          "originalContractY": 2147483701,
-          "side": 2,
-          "layer": 17,
-          "point": 4
-        },
-        {
-          "normalizedX": -162,
-          "normalizedY": -55,
-          "originalContractX": 2147483484,
-          "originalContractY": 2147483591,
-          "side": 3,
-          "layer": 17,
-          "point": 4
-        },
-        {
-          "normalizedX": -167,
+          "normalizedX": -187,
           "normalizedY": 65,
-          "originalContractX": 2147483479,
+          "originalContractX": 2147483459,
           "originalContractY": 2147483711,
           "side": 2,
-          "layer": 18,
+          "layer": 20,
           "point": 5
         },
         {
-          "normalizedX": -167,
+          "normalizedX": -187,
           "normalizedY": -65,
-          "originalContractX": 2147483479,
+          "originalContractX": 2147483459,
           "originalContractY": 2147483581,
           "side": 3,
-          "layer": 18,
-          "point": 5
-        },
-        {
-          "normalizedX": -147,
-          "normalizedY": 45,
-          "originalContractX": 2147483499,
-          "originalContractY": 2147483691,
-          "side": 2,
-          "layer": 15,
-          "point": 3
-        },
-        {
-          "normalizedX": -152,
-          "normalizedY": 55,
-          "originalContractX": 2147483494,
-          "originalContractY": 2147483701,
-          "side": 2,
-          "layer": 16,
-          "point": 4
-        },
-        {
-          "normalizedX": -152,
-          "normalizedY": -55,
-          "originalContractX": 2147483494,
-          "originalContractY": 2147483591,
-          "side": 3,
-          "layer": 16,
-          "point": 4
-        },
-        {
-          "normalizedX": -157,
-          "normalizedY": 65,
-          "originalContractX": 2147483489,
-          "originalContractY": 2147483711,
-          "side": 2,
-          "layer": 17,
-          "point": 5
-        },
-        {
-          "normalizedX": -157,
-          "normalizedY": -65,
-          "originalContractX": 2147483489,
-          "originalContractY": 2147483581,
-          "side": 3,
-          "layer": 17,
-          "point": 5
-        },
-        {
-          "normalizedX": -137,
-          "normalizedY": 45,
-          "originalContractX": 2147483509,
-          "originalContractY": 2147483691,
-          "side": 2,
-          "layer": 14,
-          "point": 3
-        },
-        {
-          "normalizedX": -162,
-          "normalizedY": 75,
-          "originalContractX": 2147483484,
-          "originalContractY": 2147483721,
-          "side": 2,
-          "layer": 18,
-          "point": 6
-        },
-        {
-          "normalizedX": -162,
-          "normalizedY": -75,
-          "originalContractX": 2147483484,
-          "originalContractY": 2147483571,
-          "side": 3,
-          "layer": 18,
-          "point": 6
-        },
-        {
-          "normalizedX": -142,
-          "normalizedY": 55,
-          "originalContractX": 2147483504,
-          "originalContractY": 2147483701,
-          "side": 2,
-          "layer": 15,
-          "point": 4
-        },
-        {
-          "normalizedX": -142,
-          "normalizedY": -55,
-          "originalContractX": 2147483504,
-          "originalContractY": 2147483591,
-          "side": 3,
-          "layer": 15,
-          "point": 4
-        },
-        {
-          "normalizedX": -147,
-          "normalizedY": 65,
-          "originalContractX": 2147483499,
-          "originalContractY": 2147483711,
-          "side": 2,
-          "layer": 16,
-          "point": 5
-        },
-        {
-          "normalizedX": -147,
-          "normalizedY": -65,
-          "originalContractX": 2147483499,
-          "originalContractY": 2147483581,
-          "side": 3,
-          "layer": 16,
+          "layer": 20,
           "point": 5
         }
       ]
     },
     {
       "zoneId": 12,
-      "name": "Zone 12 (Bank 6)",
+      "name": "Zone 12",
       "locations": [
         {
           "normalizedX": 100,
