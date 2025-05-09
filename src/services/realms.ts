@@ -3,15 +3,15 @@ import { ResourcesIds } from '../types/resources';
 
 // Troop requirements: each troop maps to an array of required resource IDs
 const TROOP_REQUIREMENTS: Partial<Record<ResourcesIds, ResourcesIds[]>> = {
-  [ResourcesIds.Knight]: [ResourcesIds.Copper, ResourcesIds.Obsidian],
-  [ResourcesIds.KnightT2]: [ResourcesIds.Hartwood, ResourcesIds.Diamonds],
-  [ResourcesIds.KnightT3]: [ResourcesIds.TrueIce, ResourcesIds.Adamantine],
+  [ResourcesIds.Knight]: [ResourcesIds.Obsidian, ResourcesIds.ColdIron],
+  [ResourcesIds.KnightT2]: [ResourcesIds.Ruby, ResourcesIds.DeepCrystal],
+  [ResourcesIds.KnightT3]: [ResourcesIds.TwilightQuartz, ResourcesIds.Mithral],
   [ResourcesIds.Crossbowman]: [ResourcesIds.Silver, ResourcesIds.Ironwood],
-  [ResourcesIds.CrossbowmanT2]: [ResourcesIds.Sapphire, ResourcesIds.Ruby],
-  [ResourcesIds.CrossbowmanT3]: [ResourcesIds.TwilightQuartz, ResourcesIds.Mithral],
+  [ResourcesIds.CrossbowmanT2]: [ResourcesIds.Diamonds, ResourcesIds.EtherealSilica],
+  [ResourcesIds.CrossbowmanT3]: [ResourcesIds.TrueIce, ResourcesIds.Dragonhide],
   [ResourcesIds.Paladin]: [ResourcesIds.Copper, ResourcesIds.Gold],
-  [ResourcesIds.PaladinT2]: [ResourcesIds.DeepCrystal, ResourcesIds.Ignium],
-  [ResourcesIds.PaladinT3]: [ResourcesIds.AlchemicalSilver, ResourcesIds.Dragonhide],
+  [ResourcesIds.PaladinT2]: [ResourcesIds.Sapphire, ResourcesIds.Ignium],
+  [ResourcesIds.PaladinT3]: [ResourcesIds.AlchemicalSilver, ResourcesIds.Adamantine],
 };
 
 const IGNORED_RESOURCES = [ResourcesIds.Wheat, ResourcesIds.Fish, ResourcesIds.Labor];

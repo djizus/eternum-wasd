@@ -64,16 +64,15 @@ export interface Realm {
 }
 
 export const RESOURCE_BANDS = {
-  T1_TROOPS_PRIMARY: [
-    ResourcesIds.Copper,
-    ResourcesIds.Obsidian,
-    ResourcesIds.Silver,
-    ResourcesIds.Ironwood,
-    ResourcesIds.ColdIron,
-    ResourcesIds.Gold,
-  ],
-  T2_TROOPS_SECONDARY: [ResourcesIds.Hartwood, ResourcesIds.Diamonds, ResourcesIds.Sapphire, ResourcesIds.Ruby],
-  T2_TROOPS_TERTIARY: [ResourcesIds.DeepCrystal, ResourcesIds.Ignium, ResourcesIds.EtherealSilica],
-  T3_TROOPS_SECONDARY: [ResourcesIds.TrueIce, ResourcesIds.TwilightQuartz, ResourcesIds.AlchemicalSilver],
-  T3_TROOPS_TERTIARY: [ResourcesIds.Adamantine, ResourcesIds.Mithral, ResourcesIds.Dragonhide],
-} as const; 
+  KNIGHT_T1_MATERIALS: [ResourcesIds.Obsidian, ResourcesIds.ColdIron],
+  KNIGHT_T2_MATERIALS: [ResourcesIds.Ruby, ResourcesIds.DeepCrystal],
+  KNIGHT_T3_MATERIALS: [ResourcesIds.TwilightQuartz, ResourcesIds.Mithral],
+  CROSSBOWMAN_T1_MATERIALS: [ResourcesIds.Silver, ResourcesIds.Ironwood],
+  CROSSBOWMAN_T2_MATERIALS: [ResourcesIds.Diamonds, ResourcesIds.EtherealSilica],
+  CROSSBOWMAN_T3_MATERIALS: [ResourcesIds.TrueIce, ResourcesIds.Dragonhide],
+  PALADIN_T1_MATERIALS: [ResourcesIds.Copper, ResourcesIds.Gold],
+  PALADIN_T2_MATERIALS: [ResourcesIds.Sapphire, ResourcesIds.Ignium],
+  PALADIN_T3_MATERIALS: [ResourcesIds.AlchemicalSilver, ResourcesIds.Adamantine],
+} as const;
+
+export const RESOURCE_TO_BAND: { [key in ResourcesIds]?: string } = {}; 
