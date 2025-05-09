@@ -19,6 +19,8 @@ interface HexSpot {
   side: number;      // Meaning to be clarified if important for rendering/logic
   layer: number;
   point: number;
+  ownerAddress?: string; // Added for occupied spots
+  ownerName?: string;    // Added for occupied spots
   // Potentially other properties if they differ between banks, potential, or occupied spots
 }
 
@@ -33,6 +35,8 @@ interface SelectedHexData extends Partial<HexSpot> { // Most fields from HexSpot
   type: string;
   normalizedX: number; // Ensure these are present
   normalizedY: number;
+  ownerAddress?: string; // Added
+  ownerName?: string;    // Added
   // MapCenter specific fields are already covered by Partial<HexSpot> or are x/y renamed
   x?: number; // from MapCenter, will be mapped to normalizedX
   y?: number; // from MapCenter, will be mapped to normalizedY
@@ -43,7 +47,7 @@ interface MapData {
   center: MapCenter;
   banks: HexSpot[]; // Assuming banks also follow the HexSpot structure
   allPotentialSpots: HexSpot[];
-  occupiedContractSpots: { [key: string]: HexSpot }; // Object mapping stringified index to HexSpot
+  occupiedContractSpots: HexSpot[]; // Updated from object to array
   zones: Zone[];
 }
 
@@ -90,8 +94,17 @@ const SettlingMapPage: React.FC = () => {
   const occupiedSpotsSet = useMemo(() => {
     if (!mapData || !mapData.occupiedContractSpots) return new Set<string>();
     const set = new Set<string>();
-    Object.values(mapData.occupiedContractSpots).forEach(spot => set.add(`${spot.originalContractX}-${spot.originalContractY}`));
+    mapData.occupiedContractSpots.forEach(spot => set.add(`${spot.originalContractX}-${spot.originalContractY}`));
     return set;
+  }, [mapData]);
+
+  const occupiedSpotsMap = useMemo(() => {
+    if (!mapData || !mapData.occupiedContractSpots) return new Map<string, HexSpot>();
+    const map = new Map<string, HexSpot>();
+    mapData.occupiedContractSpots.forEach(spot => {
+      map.set(`${spot.originalContractX}-${spot.originalContractY}`, spot);
+    });
+    return map;
   }, [mapData]);
 
   const hexToZoneMap = useMemo(() => {
@@ -163,6 +176,8 @@ const SettlingMapPage: React.FC = () => {
       ...( 'side' in hexData && { side: hexData.side }),
       ...( 'layer' in hexData && { layer: hexData.layer }),
       ...( 'point' in hexData && { point: hexData.point }),
+      ...( 'ownerAddress' in hexData && hexData.ownerAddress && { ownerAddress: hexData.ownerAddress }), 
+      ...( 'ownerName' in hexData && hexData.ownerName && { ownerName: hexData.ownerName }),     
     };
     setSelectedHex(dataForState);
   };
@@ -232,6 +247,8 @@ const SettlingMapPage: React.FC = () => {
               {selectedHex.originalContractX !== undefined && selectedHex.originalContractY !== undefined && 
                occupiedSpotsSet.has(`${selectedHex.originalContractX}-${selectedHex.originalContractY}`) && 
                 <p>Status: Occupied</p>}
+              {selectedHex.ownerName && <p>Owner: {selectedHex.ownerName}</p>}
+              {selectedHex.ownerAddress && <p>Owner Address: {selectedHex.ownerAddress}</p>}
             </div>
           )}
           {!selectedHex && (
@@ -287,23 +304,32 @@ const SettlingMapPage: React.FC = () => {
               {/* Layer 2: Occupied spots on top of zoned/default spots */}
               {mapData.allPotentialSpots
                 .filter(spot => occupiedSpotsSet.has(`${spot.originalContractX}-${spot.originalContractY}`))
-                .map((spot) => {
-                  const spotContractIdentifier = `${spot.originalContractX}-${spot.originalContractY}`;
-                  if (bankSpotsSet.has(spotContractIdentifier)) return null; 
-                  if (mapData.center && spot.normalizedX === mapData.center.x && spot.normalizedY === mapData.center.y && spot.layer === 0 && spot.point === 0) return null;
+                .map((potentialSpot) => {
+                  const spotContractIdentifier = `${potentialSpot.originalContractX}-${potentialSpot.originalContractY}`;
+                  
+                  // Get the full occupied spot data which includes owner info
+                  const occupiedSpotData = occupiedSpotsMap.get(spotContractIdentifier);
 
-                  const spotKey = `occupied-${spot.layer}-${spot.point}-${spot.originalContractX}-${spot.originalContractY}`;
+                  if (!occupiedSpotData) return null; // Should not happen if in occupiedSpotsSet but good check
+
+                  // Exclude banks and center tile from being re-rendered as generic occupied
+                  if (bankSpotsSet.has(spotContractIdentifier)) return null; 
+                  if (mapData.center && potentialSpot.normalizedX === mapData.center.x && potentialSpot.normalizedY === mapData.center.y && potentialSpot.layer === 0 && potentialSpot.point === 0) return null;
+
+                  const spotKey = `occupied-${potentialSpot.layer}-${potentialSpot.point}-${potentialSpot.originalContractX}-${potentialSpot.originalContractY}`;
                   return (
                     <HexagonTile
                       key={spotKey}
                       id={spotKey}
-                      x={spot.normalizedX}
-                      y={spot.normalizedY}
+                      x={potentialSpot.normalizedX} // Use potentialSpot for x,y as it's the base rendering position
+                      y={potentialSpot.normalizedY}
                       size={HEX_SIZE}
                       fillColor={OCCUPIED_FILL_COLOR} 
                       strokeColor={STROKE_COLOR}    
                       strokeWidth={HEX_STROKE_WIDTH}
-                      onClick={() => handleHexClick(spot, 'Occupied Spot')}
+                      onClick={() => {
+                        handleHexClick(occupiedSpotData, 'Occupied Spot');
+                      }}
                     />
                   );
               })}
