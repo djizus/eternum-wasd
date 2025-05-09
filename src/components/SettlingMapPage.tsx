@@ -62,27 +62,107 @@ const STROKE_COLOR = '#212529'; // Darker base stroke
 const HEX_STROKE_WIDTH = 0.15; // Even thinner for less visual clutter with bright zones
 const SPECIAL_TILE_STROKE_WIDTH = 0.4;
 
-// Ordered Zone Colors (Progression: Purples -> Blues -> Greens -> Yellows -> Oranges -> Reds)
-const ZONE_COLORS: { [key: number]: string } = {
-  1: '#be4bdb', // Bright Purple
-  2: '#845ef7', // Indigo
-  3: '#5c7cfa', // Bright Blue
-  4: '#339af0', // Medium Blue
-  5: '#22b8cf', // Cyan
-  6: '#20c997', // Teal/Mint Green
-  7: '#51cf66', // Bright Green
-  8: '#fcc419', // Yellow
-  9: '#ff922b', // Orange
-  10: '#ff6b6b', // Coral/Light Red
-  11: '#fa5252', // Red
-  12: '#e03131'  // Deeper Red
+// Placeholder for member addresses - replace with actual normalized addresses
+const MEMBER_ADDRESSES: string[] = [
+  "0x1234567890abcdef1234567890abcdef12345678", // Example Member 1
+  "0xabcdef1234567890abcdef1234567890abcdef12", // Example Member 2
+  "0xfedcba0987654321fedcba0987654321fedcba09"  // Example Member 3
+  // Add more member addresses here
+];
+
+// Helper function to convert HSL to RGB
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  s /= 100;
+  l /= 100;
+  const k = (n: number) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) =>
+    l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return [255 * f(0), 255 * f(8), 255 * f(4)];
+}
+
+// Helper function to convert RGB to Hex
+function rgbToHex(r: number, g: number, b: number): string {
+  return (
+    "#" +
+    [r, g, b]
+      .map((x) => {
+        const hex = Math.round(x).toString(16);
+        return hex.length === 1 ? "0" + hex : hex;
+      })
+      .join("")
+  );
+}
+
+// Helper function to convert HSL to Hex string
+function hslToHex(h: number, s: number, l: number): string {
+  const [r, g, b] = hslToRgb(h, s, l);
+  return rgbToHex(r, g, b);
+}
+
+// Function to generate a diverse color palette
+function generateMemberColors(count: number, baseSaturation: number, baseLightness: number): string[] {
+  const colors: string[] = [];
+  const minHue = 80; // Start from greenish-yellow/green
+  const maxHue = 330; // End at magenta/violet, avoiding reds and oranges
+  const hueRange = maxHue - minHue;
+
+  // Define oscillation patterns for saturation and lightness
+  const saturationOffsets = [0, 5, -5, 3, -3]; // e.g. 75, 80, 70, 78, 72 if baseSaturation is 75
+  const lightnessOffsets = [0, -5, 5, -3, 3];  // e.g. 60, 55, 65, 57, 63 if baseLightness is 60
+
+  for (let i = 0; i < count; i++) {
+    const hue = minHue + (i / count) * hueRange; 
+    
+    let currentSaturation = baseSaturation + saturationOffsets[i % saturationOffsets.length];
+    let currentLightness = baseLightness + lightnessOffsets[i % lightnessOffsets.length];
+
+    // Clamp values to ensure they are reasonable (e.g., S: 40-90, L: 30-80)
+    currentSaturation = Math.max(40, Math.min(90, currentSaturation));
+    currentLightness = Math.max(30, Math.min(80, currentLightness));
+
+    colors.push(hslToHex(hue, currentSaturation, currentLightness));
+  }
+  return colors;
+}
+
+// Generate 50 distinct colors
+const MEMBER_COLORS: string[] = generateMemberColors(50, 75, 60); // Saturation: 75%, Lightness: 60%
+
+const normalizeAddress = (address: string | undefined): string | undefined => {
+  if (!address) return undefined;
+  if (address.toLowerCase().startsWith('0x0')) {
+    return '0x' + address.substring(3);
+  }
+  return address.toLowerCase(); // Also ensure lowercase for consistent matching
 };
+
+// Define Member interface based on findings in other components
+interface Member {
+  _id?: string;
+  address?: string;
+  username?: string;
+}
 
 const SettlingMapPage: React.FC = () => {
   const [mapData, setMapData] = useState<MapData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedHex, setSelectedHex] = useState<SelectedHexData | null>(null); // Updated type
+  const [selectedHex, setSelectedHex] = useState<SelectedHexData | null>(null); 
+  const [guildMembers, setGuildMembers] = useState<Member[]>([]); // Store full Member objects
+  const [loadingMembers, setLoadingMembers] = useState<boolean>(true); 
+
+  // REINSTATED hexToZoneMap
+  const hexToZoneMap = useMemo(() => {
+    if (!mapData) return new Map<string, { zoneId: number; zoneName: string }>();
+    const map = new Map<string, { zoneId: number; zoneName: string }>();
+    mapData.zones.forEach(zone => {
+      zone.locations.forEach(loc => {
+        map.set(`${loc.originalContractX}-${loc.originalContractY}`, { zoneId: zone.zoneId, zoneName: zone.name });
+      });
+    });
+    return map;
+  }, [mapData]);
 
   const bankSpotsSet = useMemo(() => {
     if (!mapData) return new Set<string>();
@@ -107,36 +187,96 @@ const SettlingMapPage: React.FC = () => {
     return map;
   }, [mapData]);
 
-  const hexToZoneMap = useMemo(() => {
-    if (!mapData) return new Map<string, { zoneId: number; zoneName: string }>();
-    const map = new Map<string, { zoneId: number; zoneName: string }>();
-    mapData.zones.forEach(zone => {
-      zone.locations.forEach(loc => {
-        map.set(`${loc.originalContractX}-${loc.originalContractY}`, { zoneId: zone.zoneId, zoneName: zone.name });
-      });
+  // New: Map from normalized member address to username
+  const memberAddressToUsernameMap = useMemo(() => {
+    const map = new Map<string, string | undefined>();
+    guildMembers.forEach(member => {
+      if (member.address) {
+        map.set(normalizeAddress(member.address)!, member.username);
+      }
     });
     return map;
-  }, [mapData]);
+  }, [guildMembers]);
+
+  const memberToColorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    guildMembers.forEach((member, index) => { // Iterate over guildMembers
+      if (member.address) {
+        map.set(normalizeAddress(member.address)!, MEMBER_COLORS[index % MEMBER_COLORS.length]);
+      }
+    });
+    return map;
+  }, [guildMembers]); 
+
+  // New: Memoized list for Member Legend
+  const coloredMembersForLegend = useMemo(() => {
+    if (!mapData || !mapData.occupiedContractSpots || guildMembers.length === 0) return [];
+    console.log("[SettlingMapPage] Recomputing coloredMembersForLegend. Current memberToColorMap keys:", Array.from(memberToColorMap.keys())); 
+    const uniqueMembers = new Map<string, { name?: string; color: string; address: string }>();
+
+    mapData.occupiedContractSpots.forEach(spot => {
+      if (spot.ownerAddress) {
+        const normalizedAddr = normalizeAddress(spot.ownerAddress)!;
+        
+        if (spot.ownerName && spot.ownerName.toLowerCase().includes('adventurer')) {
+          console.log("[SettlingMapPage] Legend Check for 'adventurer':", {
+            rawAddress: spot.ownerAddress,
+            normalizedAddress: normalizedAddr,
+            ownerName: spot.ownerName,
+            isInMemberToColorMap: memberToColorMap.has(normalizedAddr),
+            colorFromMap: memberToColorMap.get(normalizedAddr)
+          }); // LOG 2b
+        }
+
+        if (memberToColorMap.has(normalizedAddr)) { 
+          if (!uniqueMembers.has(normalizedAddr)) {
+            const memberUsername = memberAddressToUsernameMap.get(normalizedAddr);
+            uniqueMembers.set(normalizedAddr, {
+              address: normalizedAddr,
+              name: memberUsername || spot.ownerName, // Prioritize API username
+              color: memberToColorMap.get(normalizedAddr)!
+            });
+          }
+        }
+      }
+    });
+    return Array.from(uniqueMembers.values()).sort((a,b) => (a.name || a.address).localeCompare(b.name || b.address));
+  }, [mapData, guildMembers, memberToColorMap, memberAddressToUsernameMap]); 
 
   useEffect(() => {
-    const fetchMapData = async () => {
+    const fetchMapAndMemberData = async () => {
+      setLoading(true);
+      setLoadingMembers(true);
       try {
-        setLoading(true);
-        const response = await fetch('/eternum_settlement_map_data.json');
-        if (!response.ok) {
-          throw new Error(`Failed to fetch map data: ${response.status} ${response.statusText}`);
+        // Fetch map data
+        const mapResponse = await fetch('/eternum_settlement_map_data.json');
+        if (!mapResponse.ok) {
+          throw new Error(`Failed to fetch map data: ${mapResponse.status} ${mapResponse.statusText}`);
         }
-        const data: MapData = await response.json();
-        setMapData(data);
+        const mapJsonData: MapData = await mapResponse.json();
+        setMapData(mapJsonData);
+
+        // Fetch member data
+        const memberResponse = await fetch('/api/members');
+        if (!memberResponse.ok) {
+          console.error('Failed to fetch guild members:', memberResponse.statusText);
+          setGuildMembers([]); 
+        } else {
+          const membersJsonData: Member[] = await memberResponse.json();
+          setGuildMembers(membersJsonData); // Store full member objects
+          console.log("[SettlingMapPage] Fetched guildMembers:", membersJsonData); // Updated LOG 1
+        }
+
       } catch (err: unknown) {
-        console.error("Error fetching map data:", err);
+        console.error("Error fetching data:", err);
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
       } finally {
         setLoading(false);
+        setLoadingMembers(false);
       }
     };
 
-    fetchMapData();
+    fetchMapAndMemberData();
   }, []);
 
   const viewBox = useMemo(() => {
@@ -167,6 +307,8 @@ const SettlingMapPage: React.FC = () => {
   }, [mapData]);
 
   const handleHexClick = (hexData: HexSpot | MapCenter, type: string) => {
+    const normalizedOwnerAddress = 'ownerAddress' in hexData ? normalizeAddress(hexData.ownerAddress) : undefined;
+
     const dataForState: SelectedHexData = {
       type: type,
       normalizedX: 'normalizedX' in hexData ? hexData.normalizedX : hexData.x,
@@ -176,13 +318,21 @@ const SettlingMapPage: React.FC = () => {
       ...( 'side' in hexData && { side: hexData.side }),
       ...( 'layer' in hexData && { layer: hexData.layer }),
       ...( 'point' in hexData && { point: hexData.point }),
-      ...( 'ownerAddress' in hexData && hexData.ownerAddress && { ownerAddress: hexData.ownerAddress }), 
+      ...(normalizedOwnerAddress && { ownerAddress: normalizedOwnerAddress }), 
       ...( 'ownerName' in hexData && hexData.ownerName && { ownerName: hexData.ownerName }),     
     };
     setSelectedHex(dataForState);
   };
 
-  if (loading) {
+  // REINSTATED getSelectedHexZoneInfo and selectedZoneInfo
+  const getSelectedHexZoneInfo = () => {
+    if (!selectedHex || selectedHex.originalContractX === undefined || selectedHex.originalContractY === undefined) return null;
+    const zoneInfo = hexToZoneMap.get(`${selectedHex.originalContractX}-${selectedHex.originalContractY}`);
+    return zoneInfo ? zoneInfo : null;
+  };
+  const selectedZoneInfo = getSelectedHexZoneInfo();
+
+  if (loading || loadingMembers) { // Check both loading states
     return <div className="map-loading">Loading Map Data...</div>;
   }
 
@@ -194,13 +344,6 @@ const SettlingMapPage: React.FC = () => {
     return <div className="map-no-data">No map data available.</div>;
   }
 
-  const getSelectedHexZoneInfo = () => {
-    if (!selectedHex || !selectedHex.originalContractX || !selectedHex.originalContractY) return null;
-    const zoneInfo = hexToZoneMap.get(`${selectedHex.originalContractX}-${selectedHex.originalContractY}`);
-    return zoneInfo ? zoneInfo : null;
-  };
-  const selectedZoneInfo = getSelectedHexZoneInfo();
-
   return (
     <div className="settling-map-root">
       <div className="map-container">
@@ -209,36 +352,10 @@ const SettlingMapPage: React.FC = () => {
           {selectedHex && (
             <div className="selected-hex-info-overlay">
               <h3>Selected: {selectedHex.type}</h3>
-              {selectedZoneInfo && (() => {
-                const { zoneName, zoneId } = selectedZoneInfo;
-                let suffix = '';
-                if (zoneId >= 1 && zoneId <= 6) {
-                  suffix = ' (Center)';
-                } else if (zoneId >= 7 && zoneId <= 12) {
-                  suffix = ' (Bank)';
-                }
-
-                let finalDisplayName = zoneName;
-                if (suffix) {
-                  const lowerZoneName = zoneName.toLowerCase();
-                  // Only add suffix if zoneName doesn't already contain a pattern like " (bank" or " (center"
-                  if (!lowerZoneName.includes(' (bank') && !lowerZoneName.includes(' (center')) {
-                    finalDisplayName = `${zoneName}${suffix}`;
-                  }
-                }
-                
-                return (
-                  <h4 style={{
-                    color: ZONE_COLORS[zoneId] || 'inherit',
-                    margin: '0.5em 0',
-                    fontWeight: 'bold',
-                    textAlign: 'center',
-                    fontSize: '1.5em'
-                  }}>
-                    {finalDisplayName}
-                  </h4>
-                );
-              })()}
+              {/* REINSTATED Zone Name display - simplified */}
+              {selectedZoneInfo && (
+                <p>Zone: {selectedZoneInfo.zoneName}</p>
+              )}
               {selectedHex.side !== undefined && selectedHex.layer !== undefined && selectedHex.point !== undefined && 
                 <p>Side, Layer, Point : ({selectedHex.side}, {selectedHex.layer}, {selectedHex.point})</p>}
               {(selectedHex.normalizedX !== undefined && selectedHex.normalizedY !== undefined) && 
@@ -257,20 +374,18 @@ const SettlingMapPage: React.FC = () => {
              </div>
           )}
 
-          {/* Zone Legend */} 
-          {mapData.zones && mapData.zones.length > 0 && (
-            <div className="zone-legend-overlay">
-              <h4>Zone Legend</h4>
+          {/* Member Color Legend */}
+          {coloredMembersForLegend.length > 0 && (
+            <div className="member-legend-overlay">
+              <h4>Member Colors</h4>
               <ul>
-                {mapData.zones
-                  .sort((a, b) => a.zoneId - b.zoneId) // Ensure zones are sorted by ID for legend
-                  .map(zone => (
-                  <li key={zone.zoneId}>
+                {coloredMembersForLegend.map(member => (
+                  <li key={member.address}>
                     <span 
                       className="legend-color-swatch"
-                      style={{ backgroundColor: ZONE_COLORS[zone.zoneId] || '#ccc' }}
+                      style={{ backgroundColor: member.color }}
                     ></span>
-                    Zone {zone.zoneId}
+                    {member.name || `${member.address.substring(0, 6)}...${member.address.substring(member.address.length - 4)}`}
                   </li>
                 ))}
               </ul>
@@ -279,12 +394,11 @@ const SettlingMapPage: React.FC = () => {
 
           <svg viewBox={viewBox} preserveAspectRatio="xMidYMid meet" className="hexagon-svg">
             <g>
-              {/* Layer 1: Base potential spots (zoned or default) */}
+              {/* Layer 1: Base potential spots (default color) */}
               {mapData.allPotentialSpots.map((spot) => {
-                const spotContractIdentifier = `${spot.originalContractX}-${spot.originalContractY}`;
                 const spotKey = `potential-${spot.layer}-${spot.point}-${spot.originalContractX}-${spot.originalContractY}`;
-                const zoneInfo = hexToZoneMap.get(spotContractIdentifier);
-                const fillColor = zoneInfo ? (ZONE_COLORS[zoneInfo.zoneId] || DEFAULT_FILL_COLOR) : DEFAULT_FILL_COLOR;
+                // REMOVED zoneInfo and zone-based fillColor
+                const fillColor = DEFAULT_FILL_COLOR; // Use default for all potential spots
 
                 return (
                   <HexagonTile
@@ -310,11 +424,16 @@ const SettlingMapPage: React.FC = () => {
                   // Get the full occupied spot data which includes owner info
                   const occupiedSpotData = occupiedSpotsMap.get(spotContractIdentifier);
 
-                  if (!occupiedSpotData) return null; // Should not happen if in occupiedSpotsSet but good check
+                  if (!occupiedSpotData) return null; 
 
-                  // Exclude banks and center tile from being re-rendered as generic occupied
                   if (bankSpotsSet.has(spotContractIdentifier)) return null; 
                   if (mapData.center && potentialSpot.normalizedX === mapData.center.x && potentialSpot.normalizedY === mapData.center.y && potentialSpot.layer === 0 && potentialSpot.point === 0) return null;
+
+                  const normalizedOwnerAddress = normalizeAddress(occupiedSpotData.ownerAddress);
+                  let fillColor = OCCUPIED_FILL_COLOR; // Default for occupied
+                  if (normalizedOwnerAddress && memberToColorMap.has(normalizedOwnerAddress)) {
+                    fillColor = memberToColorMap.get(normalizedOwnerAddress)!;
+                  }
 
                   const spotKey = `occupied-${potentialSpot.layer}-${potentialSpot.point}-${potentialSpot.originalContractX}-${potentialSpot.originalContractY}`;
                   return (
@@ -324,7 +443,7 @@ const SettlingMapPage: React.FC = () => {
                       x={potentialSpot.normalizedX} // Use potentialSpot for x,y as it's the base rendering position
                       y={potentialSpot.normalizedY}
                       size={HEX_SIZE}
-                      fillColor={OCCUPIED_FILL_COLOR} 
+                      fillColor={fillColor} 
                       strokeColor={STROKE_COLOR}    
                       strokeWidth={HEX_STROKE_WIDTH}
                       onClick={() => {

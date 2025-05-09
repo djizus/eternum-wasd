@@ -134,6 +134,42 @@
   border-radius: 2px;
 }
 
+/* New Member Legend Styles */
+.member-legend-overlay {
+  position: absolute;
+  bottom: 15px; /* Position at the bottom */
+  right: 15px;  /* Position on the right */
+  background-color: rgba(35, 39, 47, 0.9); /* Semi-transparent background */
+  padding: 10px 15px;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  color: #f8f8f2;
+  z-index: 10; /* Ensure it's above the SVG */
+  max-width: 250px; /* Max width for the legend */
+  border: 1px solid #2d3039;
+}
+
+.member-legend-overlay h4 {
+  color: #8ec6ff; /* Accent color for legend title */
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.member-legend-overlay ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.member-legend-overlay li {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+  font-size: 0.8rem;
+}
+
 /* Specific tile classes for potential targeted CSS styling if needed */
 .bank-tile {
   /* Example: might add a subtle glow or different cursor */
