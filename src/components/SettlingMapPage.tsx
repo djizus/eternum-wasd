@@ -129,12 +129,15 @@ function generateMemberColors(count: number, baseSaturation: number, baseLightne
 // Generate 50 distinct colors
 const MEMBER_COLORS: string[] = generateMemberColors(50, 75, 60); // Saturation: 75%, Lightness: 60%
 
+// Replaced with user-provided normalization function, renamed for consistency
 const normalizeAddress = (address: string | undefined): string | undefined => {
-  if (!address) return undefined;
-  if (address.toLowerCase().startsWith('0x0')) {
-    return '0x' + address.substring(3);
-  }
-  return address.toLowerCase(); // Also ensure lowercase for consistent matching
+  if (!address) return address; // Return undefined if address is undefined
+  // Remove '0x' prefix, remove leading zeros, then add '0x' back and convert to lowercase
+  const stripped = address.toLowerCase().startsWith('0x') ? address.toLowerCase().slice(2) : address.toLowerCase();
+  const normalizedHex = stripped.replace(/^0+/, '');
+  // Ensure the result is not just '0x' if the original address was e.g. '0x000'
+  if (normalizedHex === '') return '0x0'; 
+  return '0x' + normalizedHex;
 };
 
 // Define Member interface based on findings in other components
