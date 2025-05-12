@@ -92,30 +92,46 @@
 .action-buttons-row {
   display: flex;
   gap: 0.75rem;
+  align-items: center;
 }
 
-.refresh-owners-btn,
-.export-excel-btn {
+/* Replace refresh button styles with refresh status styles */
+.refresh-status {
+  display: flex;
+  align-items: center;
+  margin-left: 0.5rem;
   padding: 0.4rem 1rem;
   border-radius: 4px;
-  border: none;
-  color: #fff;
-  cursor: pointer;
+  background: #2a2a2a;
+  color: #b0b0b0;
   font-size: 0.9rem;
-  font-weight: 600;
 }
 
-.refresh-owners-btn {
-  background: #5a5a5a;
+.refresh-status .refreshing {
+  color: #8ec6ff;
+  display: flex;
+  align-items: center;
 }
 
-.refresh-owners-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.refresh-status .refreshing::before {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(142, 198, 255, 0.3);
+  border-top: 2px solid #8ec6ff;
+  border-radius: 50%;
+  margin-right: 8px;
+  animation: spin 1s linear infinite;
 }
 
-.refresh-owners-btn:hover:not(:disabled) {
-  background: #6a6a6a;
+.refresh-status .last-refresh {
+  color: #b0b0b0;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .export-excel-btn {
@@ -124,7 +140,7 @@
 }
 
 .export-excel-btn:hover {
-  background: #a2d4ff;
+  background: #7ab4ff;
 }
 
 .realms-grid {

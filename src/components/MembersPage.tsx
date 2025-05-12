@@ -16,7 +16,6 @@ const MembersPage: React.FC = () => {
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
   const [fetchingAddress, setFetchingAddress] = useState(false);
   const [memberRoles, setMemberRoles] = useState<Record<string, Member['role']>>({});
   const [savingRoleForMember, setSavingRoleForMember] = useState<string | null>(null);
@@ -150,14 +149,6 @@ const MembersPage: React.FC = () => {
     }
   };
 
-  const filteredMembers = sortedMembers.filter(member => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      (member.username?.toLowerCase().includes(searchLower) || false) ||
-      (member.role?.toLowerCase().includes(searchLower) || false)
-    );
-  });
-
   const handleRoleChange = async (member: Member, newRole: Member['role']) => {
     const memberKey = member._id || member.address;
     if (!memberKey) {
@@ -215,78 +206,8 @@ const MembersPage: React.FC = () => {
     }
   };
 
-  const handleEliteChange = async (member: Member, newIsElite: boolean) => {
-    const memberKey = member._id || member.address;
-    if (!memberKey) {
-      setError("Cannot update elite status: Member identifier is missing.");
-      return;
-    }
-
-    const originalIsElite = memberEliteStatus[memberKey];
-
-    setMemberEliteStatus(prevStatus => ({
-      ...prevStatus,
-      [memberKey]: newIsElite,
-    }));
-    setSavingEliteForMember(memberKey);
-    setError(null);
-
-    try {
-      const payload = {
-        identifier: memberKey,
-        id: member._id,
-        address: member.address,
-        isElite: newIsElite
-      };
-
-      const res = await fetch('/api/members/update-elite', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        setMemberEliteStatus(prevStatus => ({
-          ...prevStatus,
-          [memberKey]: originalIsElite,
-        }));
-        throw new Error(errorData.error || `Failed to save elite status for ${member.username || memberKey} (${res.status})`);
-      }
-
-      setMembers(prevMembers =>
-        prevMembers.map(m =>
-          (m._id || m.address) === memberKey ? { ...m, isElite: newIsElite } : m
-        )
-      );
-
-    } catch (err: unknown) {
-      console.error("Failed to save elite status:", err);
-      let errorMessage = 'Failed to save elite status';
-      if (err instanceof Error) {
-        errorMessage = err.message;
-      }
-      setError(errorMessage);
-    } finally {
-      setSavingEliteForMember(null);
-    }
-  };
-
   return (
     <div className="members-root">
-      <div className="members-header">
-        <h1>WASD Guild Members</h1>
-        <div className="members-search">
-          <input
-            type="text"
-            placeholder="Search members..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
-          />
-        </div>
-      </div>
-
       <div className="add-member-section">
         <h2>Add New Member</h2>
         <form onSubmit={handleAdd} className="add-member-form">
@@ -330,23 +251,26 @@ const MembersPage: React.FC = () => {
       <div className="members-list">
         <div className="members-list-header">
           <div className="header-cell username">Controller name</div>
+          <div className="header-cell address">Address</div>
           <div className="header-cell realm-count">Season Passes</div>
           <div className="header-cell role">Role</div>
-          <div className="header-cell elite">Elite Unit</div>
           <div className="header-cell actions">Actions</div>
         </div>
         
         {loading && members.length === 0 ? (
           <div className="loading-message">Loading members...</div>
-        ) : filteredMembers.length === 0 ? (
+        ) : sortedMembers.length === 0 ? (
           <div className="no-members">No members found</div>
         ) : (
-          filteredMembers.map((member) => {
+          sortedMembers.map((member) => {
             const memberKey = member._id || member.address || Date.now().toString();
             return (
               <div key={memberKey} className="member-row">
                 <div className="member-cell username">
                   {member.username || <span className="empty-value">-</span>}
+                </div>
+                <div className="member-cell address">
+                  {member.address || <span className="empty-value">-</span>}
                 </div>
                 <div className="member-cell realm-count">
                   {member.realmCount !== undefined ? member.realmCount : 'N/A'}
@@ -355,7 +279,7 @@ const MembersPage: React.FC = () => {
                   <select
                     value={memberRoles[memberKey] || ''}
                     onChange={(e) => handleRoleChange(member, e.target.value as Member['role'])}
-                    disabled={loading || savingRoleForMember === memberKey || savingEliteForMember === memberKey}
+                    disabled={loading || savingRoleForMember === memberKey}
                     className="role-select"
                   >
                     <option value="">Select Role</option>
@@ -364,20 +288,11 @@ const MembersPage: React.FC = () => {
                     <option value="hybrid">Hybrid</option>
                   </select>
                 </div>
-                <div className="member-cell elite">
-                  <input 
-                    type="checkbox"
-                    checked={memberEliteStatus[memberKey] || false}
-                    onChange={(e) => handleEliteChange(member, e.target.checked)}
-                    disabled={loading || savingRoleForMember === memberKey || savingEliteForMember === memberKey}
-                    className="elite-checkbox"
-                  />
-                </div>
                 <div className="member-cell actions">
                   <button
                     onClick={() => handleRemove(member)}
                     className="remove-button"
-                    disabled={loading || savingRoleForMember === memberKey || savingEliteForMember === memberKey}
+                    disabled={loading || savingRoleForMember === memberKey}
                   >
                     Remove
                   </button>

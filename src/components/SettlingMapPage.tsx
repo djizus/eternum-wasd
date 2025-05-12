@@ -63,12 +63,6 @@ const HEX_STROKE_WIDTH = 0.15; // Even thinner for less visual clutter with brig
 const SPECIAL_TILE_STROKE_WIDTH = 0.4;
 
 // Placeholder for member addresses - replace with actual normalized addresses
-const MEMBER_ADDRESSES: string[] = [
-  "0x1234567890abcdef1234567890abcdef12345678", // Example Member 1
-  "0xabcdef1234567890abcdef1234567890abcdef12", // Example Member 2
-  "0xfedcba0987654321fedcba0987654321fedcba09"  // Example Member 3
-  // Add more member addresses here
-];
 
 // Helper function to convert HSL to RGB
 function hslToRgb(h: number, s: number, l: number): [number, number, number] {

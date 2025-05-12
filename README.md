@@ -1,95 +1,162 @@
-# Eternum WASD - S1 Pass Manager
+# Eternum WASD S1 Dashboard
 
-An Next.js-based web application for managing WASD guild members and tracking S1 Season Passes. This project uses modern web technologies and follows best practices for a scalable and maintainable codebase.
+A modern web application for managing WASD guild members, tracking S1 Season Passes, and visualizing the Settling Map for the Eternum game. Built with Next.js, TypeScript, and MongoDB, it provides a robust dashboard, interactive map, and member management tools for guild administrators and members.
+
+---
+
+## Table of Contents
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [API Endpoints](#api-endpoints)
+- [Getting Started](#getting-started)
+- [Available Scripts](#available-scripts)
+- [Development](#development)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
+## Features
+
+- **Member Management**
+  - Add, remove, and list guild members
+  - Fetch Starknet address from Cartridge username
+  - Assign roles (warmonger, farmer, hybrid) and elite status
+  - Display and sort by S1 Passes owned per member
+
+- **S1 Season Pass Dashboard**
+  - View all S1 Passes with details (resources, troops, owner, etc.)
+  - Data is fetched periodically using a SQL query.
+  - Filter by name/ID, resource, troop type, owner
+  - Owner filter prioritizes guild members (by username)
+  - Filter for passes owned by guild members only
+  - Export filtered list to Excel
+  - Automatically refreshes owner data every 5 minutes.
+
+- **Settling Map**
+  - Interactive hex map showing banks, zones, and occupation
+  - Visualizes which members occupy which spots
+  - Color-coded by member, zone, and special tiles
+  - Clickable hexes for details
+
+- **Authentication**
+  - Discord login via NextAuth
+  - Access control for map and dashboard
+
+- **Modern UI**
+  - Responsive, mobile-friendly design
+  - TailwindCSS for rapid styling
+  - Type-safe development with TypeScript
+
+---
 
 ## Tech Stack
 
-- **Framework**: Next.js 15.3.1
-- **Language**: TypeScript
-- **Styling**: TailwindCSS
-- **Database**: MongoDB
-- **Development**: Turbopack for faster development experience
+- **Framework:** Next.js 15.3.1
+- **Language:** TypeScript
+- **Styling:** TailwindCSS
+- **Database:** MongoDB
+- **Authentication:** NextAuth (Discord)
+- **Development:** Turbopack
+- **Other:** XLSX (Excel export), Node Fetch
+
+---
 
 ## Project Structure
 
 ```
 src/
 ├── app/
-│   ├── api/              # API Routes
-│   │   ├── cartridge-address/ # Fetches address from Cartridge API
-│   │   │   └── route.ts
-│   │   ├── members/          # Member CRUD operations
-│   │   │   └── route.ts
-│   │   ├── members-with-realm-counts/ # Fetches members with pass counts
-│   │   │   └── route.ts
-│   │   ├── owners/           # (Existing - purpose may need review)
-│   │   ├── realms/           # Serves pass data from DB
-│   │   │   └── route.ts
-│   │   └── update-owners/    # (Existing - purpose may need review)
-│   ├── members/          # Members page route
-│   └── ... (other page routes, layout, globals)
-├── components/       # React components
-│   ├── Dashboard.css
-│   ├── Dashboard.tsx     # Main S1 Pass dashboard component
-│   ├── Header.css
-│   ├── Header.tsx
-│   ├── MembersPage.css
-│   └── MembersPage.tsx   # Member management component
-├── services/         # Backend services and integrations
-│   └── realms.ts       # Helper functions for processing pass data
-├── types/           # TypeScript type definitions
-└── lib/             # Utility functions (e.g., MongoDB connection)
+│   ├── api/                  # API routes (REST endpoints)
+│   │   ├── cartridge-address/      # Fetches address from Cartridge API
+│   │   ├── members/                # Member CRUD, roles, elite status
+│   │   ├── members-with-realm-counts/ # Members with S1 Pass counts
+│   │   ├── realms/                 # S1 Pass data
+│   │   └── ...
+│   ├── members/              # Members management page
+│   ├── settling-map/         # Settling Map page
+│   ├── season-passes/        # S1 Pass dashboard page
+│   └── ... (layouts, globals)
+├── components/               # React components
+│   ├── Dashboard.tsx         # S1 Pass dashboard
+│   ├── MembersPage.tsx       # Member management
+│   ├── SettlingMapPage.tsx   # Interactive map
+│   └── ... (styles, header, etc.)
+├── services/                 # Backend logic (e.g., realms.ts)
+├── types/                    # TypeScript types (e.g., resources, Realm)
+├── lib/                      # Utilities (e.g., MongoDB connection)
+└── ...
 ```
 
-## Features
+---
 
-- Member management system (Add/Remove/List)
-  - Fetch Starknet address from Cartridge username
-  - Display count of S1 Passes owned per member (sorted by count desc)
-- S1 Season Pass Dashboard
-  - View list of S1 Passes with details (Resources, Troops)
-  - Filter by Name/ID, Resource, Troop Type, Owner
-  - Owner filter shows guild members (by username) first
-  - Option to filter for passes owned by guild members only
-  - Export filtered list to Excel
-- Modern, responsive UI with TailwindCSS
-- Type-safe development with TypeScript
+## API Endpoints
+
+- `GET /api/members` — List all members
+- `POST /api/members` — Add a member (by address or username)
+- `DELETE /api/members` — Remove a member
+- `PUT /api/members/roles` — Update member roles
+- `PUT /api/members/update-elite` — Update elite status
+- `GET /api/members-with-realm-counts` — List members with S1 Pass counts
+- `GET /api/realms` — Fetch all S1 Passes (realms)
+- `GET /api/cartridge-address` — Fetch Starknet address from Cartridge username
+- `POST /api/update-owners` — Triggers an update of S1 Pass owners using a SQL query.
+- ...and more (see `src/app/api/` for details)
+
+---
 
 ## Getting Started
 
-1. Clone the repository
-2. Install dependencies:
+1. **Clone the repository:**
+   ```bash
+   git clone <repo-url>
+   cd eternum-wasd
+   ```
+2. **Install dependencies:**
    ```bash
    npm install
    ```
-
-3. Set up environment variables:
-   Create a `.env.local` file with the following variables:
+3. **Set up environment variables:**
+   Create a `.env.local` file with:
    ```
    MONGODB_URI=your_mongodb_connection_string
+   MONGODB_DB=EternumWASD # (optional, defaults to this)
+   NEXTAUTH_URL=http://localhost:3000
+   NEXTAUTH_SECRET=your_nextauth_secret
+   DISCORD_CLIENT_ID=your_discord_client_id
+   DISCORD_CLIENT_SECRET=your_discord_client_secret
+   
+   # Season Passes SQL query and contract address
+   SEASON_PASSES_SQL=https://api.cartridge.gg/x/seasonpass-mainnet-2/torii/sql
+   SEASON_PASSES_CONTRACT_ADDRESS=0x60e8836acbebb535dfcd237ff01f20be503aae407b67bb6e3b5869afae97156
    ```
-
-4. Run the development server:
+4. **Run the development server:**
    ```bash
    npm run dev
    ```
+5. **Open** [http://localhost:3000](http://localhost:3000) in your browser.
 
-5. Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
+---
 
 ## Available Scripts
 
-- `npm run dev` - Start the development server with Turbopack
-- `npm run build` - Build the application for production
-- `npm run start` - Start the production server
-- `npm run lint` - Run ESLint for code quality checks
+- `npm run dev` — Start the development server (Turbopack)
+- `npm run build` — Build for production
+- `npm run start` — Start the production server
+- `npm run lint` — Run ESLint
+
+---
 
 ## Development
 
-The project uses:
-- ESLint for code linting
-- TypeScript for type safety
-- TailwindCSS for styling
-- MongoDB for data persistence
+- **Linting:** ESLint
+- **Type Safety:** TypeScript
+- **Styling:** TailwindCSS
+- **Database:** MongoDB
+- **Authentication:** NextAuth (Discord)
+
+---
 
 ## Contributing
 
@@ -99,26 +166,10 @@ The project uses:
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
+---
+
 ## License
 
-This project is licensed under the MIT License.
+MIT License. See [LICENSE](LICENSE) for details.
 
 Copyright (c) 2025 - WASD
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.

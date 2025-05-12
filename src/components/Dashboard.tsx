@@ -85,6 +85,7 @@ const Dashboard = () => {
   const [sortBy, setSortBy] = useState<'name' | 'id'>('id');
   const [isProcessingFilters, setIsProcessingFilters] = useState(false);
   const [isRefreshingOwners, setIsRefreshingOwners] = useState(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
   const [filterByGuildMembers, setFilterByGuildMembers] = useState<boolean>(true);
 
   useEffect(() => {
@@ -264,43 +265,56 @@ const Dashboard = () => {
     XLSX.writeFile(workbook, 's1_passes_export.xlsx');
   };
 
-  const handleRefreshOwners = async () => {
-    setIsRefreshingOwners(true);
-    console.log('Manual owner refresh triggered');
-    try {
-      // Call the backend API to trigger the update process
-      const updateResponse = await fetch('/api/update-owners', {
-        method: 'POST',
-        // No body needed unless sending parameters
-      });
+  useEffect(() => {
+    // Define the refresh function
+    const refreshOwners = async () => {
+      if (isRefreshingOwners) return; // Prevent multiple refreshes at once
+      
+      setIsRefreshingOwners(true);
+      console.log('Automatic owner refresh triggered');
+      try {
+        // Call the backend API to trigger the update process
+        const updateResponse = await fetch('/api/update-owners', {
+          method: 'POST',
+        });
 
-      if (!updateResponse.ok) {
-        // Try to get error message from response body
-        let errorMsg = `API call failed with status ${updateResponse.status}`;
-        try {
-            const errorData = await updateResponse.json();
-            errorMsg = errorData.error || errorMsg;
-        } catch (_e) { /* ignore json parsing error */ }
-        throw new Error(errorMsg);
+        if (!updateResponse.ok) {
+          // Try to get error message from response body
+          let errorMsg = `API call failed with status ${updateResponse.status}`;
+          try {
+              const errorData = await updateResponse.json();
+              errorMsg = errorData.error || errorMsg;
+          } catch (_e) { /* ignore json parsing error */ }
+          throw new Error(errorMsg);
+        }
+
+        const result = await updateResponse.json();
+        console.log('Owner update API response:', result);
+
+        // If update was successful, reload realm data from the primary API
+        console.log('Reloading realm data from /api/realms...');
+        const loadedRealms = await loadRealms(); // Fetches from /api/realms (which reads DB)
+        setRealms(loadedRealms);
+        console.log('Automatic refresh complete, data reloaded.');
+        setLastRefreshTime(new Date());
+
+      } catch (error) {
+        console.error('Error during automatic owner refresh:', error);
+        // We don't show alerts for automatic refresh failures to avoid disrupting UX
+      } finally {
+        setIsRefreshingOwners(false);
       }
+    };
 
-      const result = await updateResponse.json();
-      console.log('Owner update API response:', result);
-
-      // If update was successful, reload realm data from the primary API
-      console.log('Reloading realm data from /api/realms...');
-      const loadedRealms = await loadRealms(); // Fetches from /api/realms (which reads DB)
-      setRealms(loadedRealms);
-      console.log('Manual refresh complete, data reloaded.');
-
-    } catch (error) {
-      console.error('Error during manual owner refresh:', error);
-      // Here you might want to show an error message to the user
-      alert(`Failed to refresh owners: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setIsRefreshingOwners(false);
-    }
-  };
+    // Initial refresh when component mounts
+    refreshOwners();
+    
+    // Set up interval for automatic refresh
+    const refreshInterval = setInterval(refreshOwners, 300000); // 300000 ms = 5 minutes
+    
+    // Clean up interval on component unmount
+    return () => clearInterval(refreshInterval);
+  }, [isRefreshingOwners]); // Added isRefreshingOwners to dependency array
 
   if (loading) {
     return (
@@ -443,20 +457,21 @@ const Dashboard = () => {
               Clear Filters
             </button>
             <button
-              className="refresh-owners-btn"
-              onClick={handleRefreshOwners}
-              disabled={isRefreshingOwners}
-              style={{ marginLeft: '0.5rem', padding: '0.4rem 1rem', borderRadius: '4px', border: 'none', background: '#5a5a5a', color: '#fff', cursor: 'pointer', opacity: isRefreshingOwners ? 0.6 : 1 }}
-            >
-              {isRefreshingOwners ? 'Refreshing Owners...' : 'Refresh Owners'}
-            </button>
-            <button
               className="export-excel-btn"
               onClick={handleExportExcel}
               style={{ marginLeft: '0.5rem', padding: '0.4rem 1rem', borderRadius: '4px', border: 'none', background: '#8ec6ff', color: '#000', fontWeight: 600, cursor: 'pointer' }}
             >
               Export to Excel
             </button>
+            <div className="refresh-status">
+              {isRefreshingOwners ? (
+                <span className="refreshing">Refreshing owners...</span>
+              ) : (
+                <span className="last-refresh">
+                  {lastRefreshTime ? `Last refreshed: ${lastRefreshTime.toLocaleTimeString()}` : 'Refreshing...'}
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <div className="realms-list-wrapper">
