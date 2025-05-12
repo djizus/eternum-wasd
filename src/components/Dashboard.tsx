@@ -81,7 +81,6 @@ const Dashboard = () => {
           loadRealms(),
           fetch('/api/members') 
         ]);
-        console.log('Loaded realms from service:', loadedRealmsData); // Log raw data
         setRealms(loadedRealmsData); 
 
         if (memberResponse.ok) {
