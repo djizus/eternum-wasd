@@ -32,6 +32,7 @@
   flex-direction: column;
   gap: 0.75rem;
   margin-bottom: 1rem;
+  padding: 0 1rem;
 }
 
 .filter-row {
@@ -75,18 +76,51 @@
   user-select: none;
 }
 
-.clear-filters-btn {
-  padding: 0.4rem 1rem;
+.clear-filters-btn,
+.export-excel-btn,
+.refresh-owners-btn {
+  padding: 0.5rem 1rem;
   border-radius: 4px;
   border: none;
-  background: #444;
-  color: #fff;
   cursor: pointer;
   font-size: 0.9rem;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+  font-weight: 500;
+}
+
+.clear-filters-btn {
+  background: #444;
+  color: #ccc;
 }
 
 .clear-filters-btn:hover {
   background: #555;
+  color: #fff;
+}
+
+.export-excel-btn {
+  background-color: #3a8a4a;
+  color: #ffffff;
+}
+
+.export-excel-btn:hover {
+  background-color: #4a9a5a;
+}
+
+.refresh-owners-btn {
+  background-color: #3a7bd5;
+  color: #ffffff;
+}
+
+.refresh-owners-btn:hover:not(:disabled) {
+  background-color: #4a8be5;
+}
+
+.refresh-owners-btn:disabled {
+  background-color: #334f70;
+  color: #88aacc;
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .action-buttons-row {
@@ -102,7 +136,7 @@
   margin-left: 0.5rem;
   padding: 0.4rem 1rem;
   border-radius: 4px;
-  background: #2a2a2a;
+  background: #7ab4ff;
   color: #b0b0b0;
   font-size: 0.9rem;
 }
@@ -132,15 +166,6 @@
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
-}
-
-.export-excel-btn {
-  background: #8ec6ff;
-  color: #000;
-}
-
-.export-excel-btn:hover {
-  background: #7ab4ff;
 }
 
 .realms-grid {
@@ -241,7 +266,7 @@
 
 .realms-list-header, .realms-list-row {
   display: grid;
-  grid-template-columns: 48px 1.1fr 0.9fr 80px 1.1fr 1.1fr;
+  grid-template-columns: 60px 1.1fr 0.9fr 80px 1.1fr 1.1fr;
   align-items: center;
   padding: 0.5rem 0.5rem;
   min-height: 2.2rem;
@@ -378,7 +403,7 @@
 
 @media (max-width: 900px) {
   .realms-list-header, .realms-list-row {
-    grid-template-columns: 48px 1fr 1fr 60px 1fr 1fr;
+    grid-template-columns: 60px 1fr 1fr 60px 1fr 1fr;
     font-size: 0.9rem;
   }
   
@@ -393,7 +418,7 @@
 
 @media (max-width: 600px) {
   .realms-list-header, .realms-list-row {
-    grid-template-columns: 40px 1fr 1fr 50px 1fr 1fr;
+    grid-template-columns: 50px 1fr 1fr 50px 1fr 1fr;
     font-size: 0.85rem;
   }
   
@@ -527,4 +552,43 @@
 .filtering-overlay .spinner {
   margin: 0;
   border-top-color: #8ec6ff;
+}
+
+/* Troop Tag Styling */
+.troop-tag {
+  display: inline-block;
+  padding: 2px 6px;
+  margin: 2px 3px 2px 0;
+  border-radius: 4px;
+  font-size: 0.92em;
+  color: #ffffff;
+}
+
+/* Tier-specific colors (adjust as needed) */
+.troop-tag[data-tier="T1"] {
+  background-color: #4a7a4a;
+}
+
+.troop-tag[data-tier="T2"] {
+  background-color: #5a5aa8;
+}
+
+.troop-tag[data-tier="T3"] {
+  background-color: #8a3a8a;
+}
+
+.troop-tag[data-tier="unknown"] {
+  background-color: #666666;
+}
+
+/* Ensure troop tags wrap nicely within the column */
+.col-troops {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Adjust spacing in summary list for troop tags */
+.dashboard-summary-panel ul li .troop-tag {
+  margin-right: 5px;
 } 

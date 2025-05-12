@@ -1,17 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getDatabase } from '../../../lib/mongodb'; // Corrected path
-import { ObjectId } from 'mongodb'; // Import ObjectId
-// We don't need the full loadRealms service here, just direct DB access
-// import { loadRealms } from '../../../services/realms'; 
+import { Collection, Db } from 'mongodb'; // Import Db and Collection types
 
 // Define the Member structure expected from the DB/API
 interface Member {
   _id?: string;
   address?: string;
   username?: string;
-  role?: 'warmonger' | 'farmer' | 'hybrid' | null; // Added role to interface
-  isElite?: boolean; // Added isElite to interface
-  realmCount?: number; // This is added by the aggregation
+  role?: 'warmonger' | 'farmer' | 'hybrid' | null;
+  isElite?: boolean; // Keep isElite if it might exist
+  // realmCount will be added by the aggregation
 }
 
 // Define the structure returned by this API route
@@ -19,90 +17,67 @@ interface MemberWithRealmCount extends Member {
   realmCount: number;
 }
 
-// Type for the individual realm/pass objects within the single document
-interface RealmPassData {
-  owner?: string;
-  name?: string; // Example other property
-  // Add other expected properties of a pass if known
-}
-
-// This type is for the raw document fetched, which might have an _id
-// and other dynamic string keys pointing to RealmPassData.
-// We won't use a direct index signature on this to avoid `any` for the values part.
-interface FetchedPassesDocument {
-  _id?: ObjectId; // Use specific ObjectId type
-  // Other properties are dynamic keys [key: string]: RealmPassData
-  // We will handle this by iterating with Object.entries and casting values.
-}
+// No longer need RealmPassData interface for parsing single doc
 
 export async function GET() {
   console.log("API route /api/members-with-realm-counts called");
   try {
-    const db = await getDatabase();
-    
-    // 1. Fetch all members - ensure isElite is fetched if present
-    const membersCollection = db.collection('members');
-    // No specific projection needed here for find, as it fetches all fields by default.
-    // The `isElite` field will be included if it exists on the documents.
-    const members: Member[] = await membersCollection.find<Member>({}).toArray();
-    console.log(`Fetched ${members.length} members`);
+    const db: Db = await getDatabase(); // Use Db type
+    const membersCollection: Collection<Member> = db.collection('members');
 
-    // 2. Fetch the single document containing all realm data
-    const realmsCollection = db.collection('realms'); 
-    // Fetch the single document. The exact type from DB is complex, so cast to our expected shape.
-    const allPassesDoc = await realmsCollection.findOne() as FetchedPassesDocument | null;
+    console.log("Starting aggregation pipeline...");
 
-    if (!allPassesDoc) {
-      console.error("No document found in 'realms' collection.");
-      // Return members with 0 counts if realms doc is missing
-      const membersWithZeroCounts = members.map(member => ({ ...member, realmCount: 0 }));
-      return NextResponse.json(membersWithZeroCounts);
-    }
-    console.log("Fetched the single realms document.");
-
-    // 3. Calculate realm counts per owner from the single document
-    const realmCounts = new Map<string, number>();
-
-    // Iterate using Object.entries, similar to loadRealms
-    for (const [key, value] of Object.entries(allPassesDoc)) {
-      if (key === '_id') { 
-        continue; // Skip the _id field
+    const aggregationPipeline = [
+      // Stage 1: Perform a left outer join to the realms collection
+      {
+        $lookup: {
+          from: 'realms', // The collection to join
+          let: { memberAddress: '$address' }, // Variable for the member's address
+          pipeline: [
+            // Pipeline within $lookup to match and count
+            {
+              $match: {
+                $expr: {
+                  // Match where realm's seasonPassOwner (case-insensitive) equals member's address
+                  $eq: [
+                    { $toLower: '$seasonPassOwner' }, // Convert realm owner to lowercase
+                    { $toLower: '$$memberAddress' } // Convert member address to lowercase
+                  ]
+                }
+              }
+            },
+            // Count the matched realms for this member
+            {
+              $count: 'matchedRealms'
+            }
+          ],
+          as: 'realmData' // The array field added to each member document
+        }
+      },
+      // Stage 2: Add the realmCount field
+      {
+        $addFields: {
+          // If realmData array is not empty, take the count from the first element, otherwise default to 0
+          realmCount: { $ifNull: [ { $first: '$realmData.matchedRealms' }, 0 ] }
+        }
+      },
+      // Stage 3: Project to remove the temporary realmData field
+      {
+        $project: {
+          realmData: 0 // Exclude the realmData field from the final output
+        }
       }
+    ];
 
-      // Now, 'value' is an individual pass object. Cast it to RealmPassData.
-      const passData = value as RealmPassData; 
-        
-      if (passData && typeof passData === 'object' && passData.owner && typeof passData.owner === 'string') {
-        const ownerAddress = passData.owner;
-        const lowerCaseOwner = ownerAddress.toLowerCase();
-        realmCounts.set(lowerCaseOwner, (realmCounts.get(lowerCaseOwner) || 0) + 1);
-      } 
-    }
-    console.log(`Calculated counts for ${realmCounts.size} unique owners from the single document.`);
+    // Execute the aggregation pipeline
+    const membersWithCounts: MemberWithRealmCount[] = await membersCollection.aggregate<MemberWithRealmCount>(aggregationPipeline).toArray();
 
-    // 4. Combine member data with realm counts
-    let lookupExampleLogged = false; // Log only one example
-    const membersWithCounts: MemberWithRealmCount[] = members.map(member => {
-      const lowerCaseAddress = member.address ? member.address.toLowerCase() : null;
-      const count = lowerCaseAddress ? realmCounts.get(lowerCaseAddress) || 0 : 0;
-      
-      // Log first lookup example
-      if (!lookupExampleLogged && lowerCaseAddress) {
-        console.log(`Example lookup: Member Addr (lower): ${lowerCaseAddress}, Found Count: ${realmCounts.has(lowerCaseAddress) ? count : 'Not Found in Map'}`);
-        lookupExampleLogged = true;
-      }
+    console.log(`Aggregation finished. Found ${membersWithCounts.length} members with counts.`);
 
-      return {
-        ...member,
-        realmCount: count,
-      };
-    });
-
-    console.log("Finished mapping counts to members.");
     return NextResponse.json(membersWithCounts);
 
   } catch (error: unknown) {
-    console.error('Error fetching members with realm counts:', error);
+    console.error('Error fetching members with realm counts via aggregation:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown server error';
     return NextResponse.json({ error: `Failed to fetch member data: ${errorMessage}` }, { status: 500 });
   }

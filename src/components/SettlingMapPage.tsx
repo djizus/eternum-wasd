@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import './SettlingMapPage.css'; // We'll create this CSS file next
 import HexagonTile from './HexagonTile'; // Import the new component
+import type { ResourceDefinition } from '../types/resources'; // Import ResourceDefinition
+import { getResourceDefinitionFromName } from '../types/resources'; // Import lookup function
 
 // Define interfaces based on your JSON structure (can be expanded later)
 interface MapCenter {
@@ -21,15 +23,8 @@ interface HexSpot {
   point: number;
   ownerAddress?: string; // Added for occupied spots
   ownerName?: string;    // Added for occupied spots
-  // Potentially other properties if they differ between banks, potential, or occupied spots
 }
 
-// REMOVED Zone Interface
-// interface Zone {
-//   zoneId: number;
-//   name: string;
-//   locations: HexSpot[]; // Updated to HexSpot[]
-// }
 
 // Combined type for selected hex data to include a 'type' and all possible fields
 interface SelectedHexData extends Partial<HexSpot> { // Most fields from HexSpot are optional
@@ -47,7 +42,7 @@ interface SelectedHexData extends Partial<HexSpot> { // Most fields from HexSpot
   isWonder: boolean;
   // Add fields for new display requirements
   realmId?: number; 
-  resourcesProduced?: string; // Store as a formatted string
+  resourcesToDisplay?: ResourceDefinition[] | null; // Store resource objects for styling
 }
 
 interface MapData {
@@ -78,17 +73,13 @@ interface SettleRealmInfo {
 }
 // --- End New Type ---
 
-// --- Updated Type for Realm Resource Data (from /api/realms) ---
-interface RealmAttribute {
-  trait_type: string;
-  value: string | number;
-}
-
-interface RealmResourceInfo {
+// --- Updated Type for Realm Resource Data (from /api/realms, matching realms.ts output) ---
+interface RealmResourceInfo { // Aligning with the structure from loadRealms /api/realms
   id: number; // Realm ID
   name: string; // Realm Name from MongoDB
-  attributes: RealmAttribute[]; // Attributes array containing resources
+  resources: ResourceDefinition[]; // Use imported ResourceDefinition type
   // Add other fields from /api/realms if needed later
+  // availableTroops?: string[]; // Could add if needed
 }
 // --- End Updated Type ---
 
@@ -268,12 +259,19 @@ const SettlingMapPage: React.FC = () => {
     return map;
   }, [settleRealmData]);
 
-  // New: Map for Realm Resource lookup (Realm ID -> Full RealmResourceInfo)
+  // New: Map for Realm Resource lookup (Realm Name -> Full RealmResourceInfo)
   const realmResourceMap = useMemo(() => {
-    const map = new Map<number, RealmResourceInfo>(); // Store the whole object
+    console.log("[SettlingMapPage] Creating realmResourceMap...");
+    const map = new Map<string, RealmResourceInfo>(); // Key is now string (realm name)
     realmResourceData.forEach(realm => {
-      map.set(realm.id, realm); // Use realm.id as key, store the realm object
+      if (realm.name) { // Ensure name exists before using it as key
+        map.set(realm.name, realm); // Use realm.name as key
+        console.log(`[SettlingMapPage] Added to realmResourceMap: Key='${realm.name}', Value=`, realm);
+      } else {
+        console.warn("[SettlingMapPage] Realm found with no name in realmResourceData:", realm);
+      }
     });
+    console.log("[SettlingMapPage] realmResourceMap created with size:", map.size);
     return map;
   }, [realmResourceData]);
 
@@ -631,7 +629,6 @@ const SettlingMapPage: React.FC = () => {
     const normalizedOwnerAddress = normalizeAddress(ownerAddressFromData);
     console.log("Contract Coords Key for Settle/Realm lookup:", contractX !== undefined && contractY !== undefined ? `${contractX}-${contractY}` : "N/A");
 
-    // Use currentSettleInfo if already identified (especially for Occupied Spots)
     const settleInfoToUse = currentSettleInfo; 
     console.log("SettleInfo for display logic:", settleInfoToUse);
 
@@ -647,29 +644,62 @@ const SettlingMapPage: React.FC = () => {
          displayOwnerName = currentPotentialSpotInfo.ownerName;
     }
 
-    const realmId = settleInfoToUse?.entity_id;
-    console.log("Extracted Realm ID (from entity_id):", realmId);
+    // --- UPDATED: Look up realm by NAME --- 
+    const realmNameFromSettle = settleInfoToUse ? hexToString(settleInfoToUse.realm_name) : undefined;
+    console.log("[SettlingMapPage][handleHexClick] Realm Name from Settle Data (for lookup):", realmNameFromSettle);
 
-    const realmInfoFromMongo = realmId ? realmResourceMap.get(realmId) : undefined;
-    console.log("RealmInfo from realmResourceMap:", realmInfoFromMongo);
+    const realmInfoFromMongo = realmNameFromSettle ? realmResourceMap.get(realmNameFromSettle) : undefined;
+    console.log("[SettlingMapPage][handleHexClick] RealmInfo from realmResourceMap (using NAME):", JSON.stringify(realmInfoFromMongo, null, 2)); // Log the whole object
 
-    let displayRealmName = settleInfoToUse ? hexToString(settleInfoToUse.realm_name) : undefined;
-    if (!displayRealmName && realmInfoFromMongo) {
-      displayRealmName = realmInfoFromMongo.name;
-    }
+    // The displayRealmName logic can now prioritize the name used for the successful lookup,
+    // or fallback to the settle name if the mongo lookup failed but we still have the settle name.
+    const displayRealmName = realmInfoFromMongo ? realmInfoFromMongo.name : realmNameFromSettle;
+    
+    // Extract realmId for display purposes, even though it's not the lookup key anymore
+    const realmId = settleInfoToUse?.entity_id; 
+    console.log("Extracted Realm ID (from entity_id for display):", realmId);
+    // --- END NAME LOOKUP --- 
 
-    let resourcesProducedString = 'N/A';
-    if (realmInfoFromMongo && realmInfoFromMongo.attributes) {
-      const resourceAttributes = realmInfoFromMongo.attributes.filter(attr => attr.trait_type === 'Resource');
-      if (resourceAttributes.length > 0) {
-        resourcesProducedString = resourceAttributes.map(attr => String(attr.value)).sort().join(', ');
-      } else {
-        resourcesProducedString = 'None';
+    // --- Keep the resource extraction logic as it was based on the matched realmInfoFromMongo ---
+    console.log("Determined Realm Name for display:", displayRealmName);
+    
+    let finalResourcesToDisplay: ResourceDefinition[] | null = null; 
+    if (realmInfoFromMongo && realmInfoFromMongo.resources) { 
+      console.log("[SettlingMapPage][handleHexClick] Found realmInfoFromMongo.resources:", JSON.stringify(realmInfoFromMongo.resources, null, 2));
+      if (realmInfoFromMongo.resources.length > 0) { 
+        let resourceDefinitions: ResourceDefinition[] = [];
+        // Check the type of the first element to determine how to map
+        if (typeof realmInfoFromMongo.resources[0] === 'string') {
+          // Handle array of strings directly
+          console.log("[SettlingMapPage][handleHexClick] Handling resources as array of strings.");
+          // Map strings to ResourceDefinitions to get rarity for styling
+          resourceDefinitions = (realmInfoFromMongo.resources as unknown as string[])
+            .map(name => getResourceDefinitionFromName(name))
+            .filter((def): def is ResourceDefinition => def !== undefined); // Filter out undefineds
+        } else if (typeof realmInfoFromMongo.resources[0] === 'object' && realmInfoFromMongo.resources[0] !== null && 'name' in realmInfoFromMongo.resources[0]) {
+          // Handle array of ResourceDefinition objects
+          console.log("[SettlingMapPage][handleHexClick] Handling resources as array of ResourceDefinition objects.");
+          resourceDefinitions = realmInfoFromMongo.resources as ResourceDefinition[]; // Use directly
+        } else {
+          console.warn("[SettlingMapPage][handleHexClick] Unknown structure for realmInfoFromMongo.resources element:", JSON.stringify(realmInfoFromMongo.resources[0], null, 2));
+          // Keep resourceDefinitions as empty array
+        }
+        // UPDATED SORT: Sort by ID (ascending) then by name (ascending)
+        finalResourcesToDisplay = resourceDefinitions.sort((a, b) => {
+         if (a.id < b.id) return -1;
+         if (a.id > b.id) return 1;
+         return a.name.localeCompare(b.name); // Secondary sort by name if IDs are equal
+        });
+        console.log("[SettlingMapPage][handleHexClick] Final resourcesToDisplay:", JSON.stringify(finalResourcesToDisplay, null, 2));
+      } else { 
+        finalResourcesToDisplay = []; // Set to empty array if none found
+        console.log("[SettlingMapPage][handleHexClick] realmInfoFromMongo.resources is empty.");
       }
+    } else if (realmInfoFromMongo) {
+      console.warn("[SettlingMapPage][handleHexClick] realmInfoFromMongo exists, but realmInfoFromMongo.resources is missing or undefined:", JSON.stringify(realmInfoFromMongo, null, 2));
+    } else {
+      console.log("[SettlingMapPage][handleHexClick] realmInfoFromMongo is undefined, cannot extract resources.");
     }
-
-    console.log("Determined Realm Name:", displayRealmName);
-    console.log("Determined Resources String:", resourcesProducedString);
 
     const dataForState: SelectedHexData = {
       type: type,
@@ -683,9 +713,10 @@ const SettlingMapPage: React.FC = () => {
       ownerAddress: normalizedOwnerAddress, 
       ownerName: displayOwnerName || '-',
       isWonder: settleInfoToUse ? settleInfoToUse.wonder !== 1 : false, 
+      // Restore realmId and displayRealmName assignment
       realmId: realmId, 
       realmName: displayRealmName || undefined,
-      resourcesProduced: resourcesProducedString
+      resourcesToDisplay: finalResourcesToDisplay // Store the array of objects
     };
     setSelectedHex(dataForState);
     console.log("--- handleHexClick End ---");
@@ -723,7 +754,22 @@ const SettlingMapPage: React.FC = () => {
                   <p>Owner: {selectedHex.ownerName}</p>
                   {selectedHex.isWonder && <p className="wonder-indicator">Status: Wonder!</p>}
                   <p>Coords: ({selectedHex.normalizedX}, {selectedHex.normalizedY})</p>
-                  <p>Resources: {selectedHex.resourcesProduced || 'N/A'}</p>
+                  <div className="info-panel-resources">
+                    <span>Resources: </span> 
+                    {selectedHex.resourcesToDisplay && selectedHex.resourcesToDisplay.length > 0 ? (
+                      selectedHex.resourcesToDisplay.map(res => (
+                        <span 
+                          key={res.id} 
+                          className="resource-pair" 
+                          data-rarity={res.rarity}
+                        >
+                          {res.name}
+                        </span>
+                      ))
+                    ) : (
+                      <span>N/A</span>
+                    )}
+                  </div>
                 </>
               ) : selectedHex.type === 'Bank' || selectedHex.type === 'Center' || selectedHex.type === 'Potential Spot' ? (
                 <> 
