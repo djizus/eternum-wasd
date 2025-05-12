@@ -14,13 +14,11 @@ const MembersPage: React.FC = () => {
   const [members, setMembers] = useState<Member[]>([]);
   const [address, setAddress] = useState('');
   const [username, setUsername] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fetchingAddress, setFetchingAddress] = useState(false);
   const [memberRoles, setMemberRoles] = useState<Record<string, Member['role']>>({});
   const [savingRoleForMember, setSavingRoleForMember] = useState<string | null>(null);
-  const [memberEliteStatus, setMemberEliteStatus] = useState<Record<string, boolean>>({});
-  const [savingEliteForMember, setSavingEliteForMember] = useState<string | null>(null);
 
   const fetchMembers = async () => {
     setLoading(true);
@@ -34,16 +32,13 @@ const MembersPage: React.FC = () => {
       const data = await res.json();
       setMembers(data);
       const initialRoles: Record<string, Member['role']> = {};
-      const initialEliteStatus: Record<string, boolean> = {};
       data.forEach((member: Member) => {
         const memberKey = member._id || member.address;
         if (memberKey) {
           initialRoles[memberKey] = member.role || null;
-          initialEliteStatus[memberKey] = member.isElite || false;
         }
       });
       setMemberRoles(initialRoles);
-      setMemberEliteStatus(initialEliteStatus);
     } catch (err: unknown) {
       console.error("Failed to fetch members:", err);
       let errorMessage = 'Failed to fetch members';

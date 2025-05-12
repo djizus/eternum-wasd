@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import './SettlingMapPage.css'; // We'll create this CSS file next
 import HexagonTile from './HexagonTile'; // Import the new component
 
@@ -24,32 +24,73 @@ interface HexSpot {
   // Potentially other properties if they differ between banks, potential, or occupied spots
 }
 
-interface Zone {
-  zoneId: number;
-  name: string;
-  locations: HexSpot[]; // Updated to HexSpot[]
-}
+// REMOVED Zone Interface
+// interface Zone {
+//   zoneId: number;
+//   name: string;
+//   locations: HexSpot[]; // Updated to HexSpot[]
+// }
 
 // Combined type for selected hex data to include a 'type' and all possible fields
 interface SelectedHexData extends Partial<HexSpot> { // Most fields from HexSpot are optional
   type: string;
   normalizedX: number; // Ensure these are present
   normalizedY: number;
+  originalContractX?: number; // Explicitly optional
+  originalContractY?: number; // Explicitly optional
   ownerAddress?: string; // Added
   ownerName?: string;    // Added
   // MapCenter specific fields are already covered by Partial<HexSpot> or are x/y renamed
   x?: number; // from MapCenter, will be mapped to normalizedX
   y?: number; // from MapCenter, will be mapped to normalizedY
+  realmName?: string;
+  isWonder: boolean;
+  // Add fields for new display requirements
+  realmId?: number; 
+  resourcesProduced?: string; // Store as a formatted string
 }
 
 interface MapData {
   maxLayers: number;
   center: MapCenter;
   banks: HexSpot[]; // Assuming banks also follow the HexSpot structure
-  allPotentialSpots: HexSpot[];
-  occupiedContractSpots: HexSpot[]; // Updated from object to array
-  zones: Zone[];
+  allPotentialSpots: HexSpot[]; // Keep for coordinate lookup
+  // zones: Zone[]; // REMOVED
 }
+
+// --- New Type for SettleRealmData ---
+interface SettleRealmInfo {
+  cities: number;
+  entity_id: number;
+  event_id: string;
+  harbors: number;
+  id: number;
+  owner_address: string; // Already exists in HexSpot but good to have here too
+  owner_name: string; // Hex encoded
+  realm_name: string; // Hex encoded
+  regions: number;
+  rivers: number;
+  timestamp: string; // Hex encoded timestamp
+  wonder: number; // 1 = not a wonder, other values = wonder
+  x: number; // Corresponds to originalContractX
+  y: number; // Corresponds to originalContractY
+  // Include other fields if needed, e.g., internal_*
+}
+// --- End New Type ---
+
+// --- Updated Type for Realm Resource Data (from /api/realms) ---
+interface RealmAttribute {
+  trait_type: string;
+  value: string | number;
+}
+
+interface RealmResourceInfo {
+  id: number; // Realm ID
+  name: string; // Realm Name from MongoDB
+  attributes: RealmAttribute[]; // Attributes array containing resources
+  // Add other fields from /api/realms if needed later
+}
+// --- End Updated Type ---
 
 const HEX_SIZE = 4; // Reduced from 10 to 4, further adjustment may be needed
 const DEFAULT_FILL_COLOR = '#44475a'; // A slightly lighter dark grey
@@ -134,6 +175,28 @@ const normalizeAddress = (address: string | undefined): string | undefined => {
   return '0x' + normalizedHex;
 };
 
+// --- New Hex to String Utility ---
+function hexToString(hex: string | undefined): string {
+  if (!hex || !hex.startsWith('0x') || hex === '0x0') {
+    return ''; // Return empty for undefined, non-hex, or zero hex
+  }
+  try {
+    const strippedHex = hex.substring(2);
+    let result = '';
+    for (let i = 0; i < strippedHex.length; i += 2) {
+      const byte = parseInt(strippedHex.substring(i, i + 2), 16);
+      if (byte > 0) { // Ignore null bytes
+        result += String.fromCharCode(byte);
+      }
+    }
+    return result;
+  } catch (e) {
+    console.error(`Failed to convert hex to string: ${hex}`, e);
+    return ''; // Return empty on error
+  }
+}
+// --- End New Utility ---
+
 // Define Member interface based on findings in other components
 interface Member {
   _id?: string;
@@ -148,40 +211,30 @@ const SettlingMapPage: React.FC = () => {
   const [selectedHex, setSelectedHex] = useState<SelectedHexData | null>(null); 
   const [guildMembers, setGuildMembers] = useState<Member[]>([]); // Store full Member objects
   const [loadingMembers, setLoadingMembers] = useState<boolean>(true); 
+  const [zoomLevel, setZoomLevel] = useState<number>(1); // Add zoom state
+  // Add state for panning
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [startDragPos, setStartDragPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [viewBoxOffset, setViewBoxOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [initialViewBoxOffset, setInitialViewBoxOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  // Add state for SettleRealmData
+  const [settleRealmData, setSettleRealmData] = useState<SettleRealmInfo[]>([]);
+  const [loadingSettleRealmData, setLoadingSettleRealmData] = useState<boolean>(true);
+  // Add state for Realm Resource data
+  const [realmResourceData, setRealmResourceData] = useState<RealmResourceInfo[]>([]);
+  const [loadingRealmResources, setLoadingRealmResources] = useState<boolean>(true);
 
-  // REINSTATED hexToZoneMap
-  const hexToZoneMap = useMemo(() => {
-    if (!mapData) return new Map<string, { zoneId: number; zoneName: string }>();
-    const map = new Map<string, { zoneId: number; zoneName: string }>();
-    mapData.zones.forEach(zone => {
-      zone.locations.forEach(loc => {
-        map.set(`${loc.originalContractX}-${loc.originalContractY}`, { zoneId: zone.zoneId, zoneName: zone.name });
-      });
-    });
-    return map;
-  }, [mapData]);
+  // Ref for the SVG element
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  // REMOVED hexToZoneMap
+  // const hexToZoneMap = useMemo(() => { ... });
 
   const bankSpotsSet = useMemo(() => {
     if (!mapData) return new Set<string>();
     const set = new Set<string>();
     mapData.banks.forEach(bank => set.add(`${bank.originalContractX}-${bank.originalContractY}`));
     return set;
-  }, [mapData]);
-
-  const occupiedSpotsSet = useMemo(() => {
-    if (!mapData || !mapData.occupiedContractSpots) return new Set<string>();
-    const set = new Set<string>();
-    mapData.occupiedContractSpots.forEach(spot => set.add(`${spot.originalContractX}-${spot.originalContractY}`));
-    return set;
-  }, [mapData]);
-
-  const occupiedSpotsMap = useMemo(() => {
-    if (!mapData || !mapData.occupiedContractSpots) return new Map<string, HexSpot>();
-    const map = new Map<string, HexSpot>();
-    mapData.occupiedContractSpots.forEach(spot => {
-      map.set(`${spot.originalContractX}-${spot.originalContractY}`, spot);
-    });
-    return map;
   }, [mapData]);
 
   // New: Map from normalized member address to username
@@ -205,32 +258,96 @@ const SettlingMapPage: React.FC = () => {
     return map;
   }, [guildMembers]); 
 
-  // New: Memoized list for Member Legend
+  // New: Map for SettleRealmData lookup
+  const settleRealmMap = useMemo(() => {
+    const map = new Map<string, SettleRealmInfo>();
+    settleRealmData.forEach(info => {
+      // Use the x and y from SettleRealmInfo as the key
+      map.set(`${info.x}-${info.y}`, info);
+    });
+    return map;
+  }, [settleRealmData]);
+
+  // New: Map for Realm Resource lookup (Realm ID -> Full RealmResourceInfo)
+  const realmResourceMap = useMemo(() => {
+    const map = new Map<number, RealmResourceInfo>(); // Store the whole object
+    realmResourceData.forEach(realm => {
+      map.set(realm.id, realm); // Use realm.id as key, store the realm object
+    });
+    return map;
+  }, [realmResourceData]);
+
+  // New: Create a lookup map for potential spots based on original contract coords
+  const potentialSpotsMap = useMemo(() => {
+    if (!mapData) return new Map<string, HexSpot>();
+    const map = new Map<string, HexSpot>();
+    mapData.allPotentialSpots.forEach(spot => {
+      map.set(`${spot.originalContractX}-${spot.originalContractY}`, spot);
+    });
+    return map;
+  }, [mapData]);
+
+  // New: Combine SettleRealmData with PotentialSpots for rendering occupied spots
+  const occupiedSpotsRenderData = useMemo(() => {
+    if (!mapData || settleRealmData.length === 0) return [];
+
+    const renderData = [];
+    for (const settleInfo of settleRealmData) {
+      const spotContractIdentifier = `${settleInfo.x}-${settleInfo.y}`;
+      const potentialSpot = potentialSpotsMap.get(spotContractIdentifier);
+
+      // Only include if it corresponds to a known potential spot
+      if (potentialSpot) {
+        const normalizedOwnerAddress = normalizeAddress(settleInfo.owner_address);
+        let fillColor = OCCUPIED_FILL_COLOR; // Default for occupied
+        if (normalizedOwnerAddress && memberToColorMap.has(normalizedOwnerAddress)) {
+          fillColor = memberToColorMap.get(normalizedOwnerAddress)!;
+        }
+        const isWonder = settleInfo.wonder !== 1;
+
+        renderData.push({
+          key: `occupied-${potentialSpot.layer}-${potentialSpot.point}-${settleInfo.x}-${settleInfo.y}`,
+          normalizedX: potentialSpot.normalizedX,
+          normalizedY: potentialSpot.normalizedY,
+          fillColor: fillColor,
+          isWonder: isWonder,
+          // Include settleInfo and potentialSpot data for the click handler
+          originalData: { ...potentialSpot, ...settleInfo } 
+        });
+      }
+    }
+    return renderData;
+  }, [mapData, settleRealmData, potentialSpotsMap, memberToColorMap]); // Dependencies
+
+  // MODIFIED: Member Legend now uses settleRealmData
   const coloredMembersForLegend = useMemo(() => {
-    if (!mapData || !mapData.occupiedContractSpots || guildMembers.length === 0) return [];
+    if (settleRealmData.length === 0 || guildMembers.length === 0) return [];
     console.log("[SettlingMapPage] Recomputing coloredMembersForLegend. Current memberToColorMap keys:", Array.from(memberToColorMap.keys())); 
     const uniqueMembers = new Map<string, { name?: string; color: string; address: string }>();
 
-    mapData.occupiedContractSpots.forEach(spot => {
-      if (spot.ownerAddress) {
-        const normalizedAddr = normalizeAddress(spot.ownerAddress)!;
-        
-        if (spot.ownerName && spot.ownerName.toLowerCase().includes('adventurer')) {
-          console.log("[SettlingMapPage] Legend Check for 'adventurer':", {
-            rawAddress: spot.ownerAddress,
-            normalizedAddress: normalizedAddr,
-            ownerName: spot.ownerName,
-            isInMemberToColorMap: memberToColorMap.has(normalizedAddr),
-            colorFromMap: memberToColorMap.get(normalizedAddr)
-          }); // LOG 2b
-        }
+    settleRealmData.forEach(settleInfo => { // Iterate over settleRealmData
+      if (settleInfo.owner_address) {
+        const normalizedAddr = normalizeAddress(settleInfo.owner_address)!;
+        const ownerNameFromHex = hexToString(settleInfo.owner_name); // Convert hex name
+
+        // Log check for specific name/address if needed (example below)
+        // if (ownerNameFromHex && ownerNameFromHex.toLowerCase().includes('adventurer')) {
+        //   console.log("[SettlingMapPage] Legend Check for 'adventurer':", {
+        //     rawAddress: settleInfo.owner_address,
+        //     normalizedAddress: normalizedAddr,
+        //     ownerName: ownerNameFromHex,
+        //     isInMemberToColorMap: memberToColorMap.has(normalizedAddr),
+        //     colorFromMap: memberToColorMap.get(normalizedAddr)
+        //   });
+        // }
 
         if (memberToColorMap.has(normalizedAddr)) { 
           if (!uniqueMembers.has(normalizedAddr)) {
             const memberUsername = memberAddressToUsernameMap.get(normalizedAddr);
             uniqueMembers.set(normalizedAddr, {
               address: normalizedAddr,
-              name: memberUsername || spot.ownerName, // Prioritize API username
+              // Prioritize API username, fallback to converted hex name
+              name: memberUsername || ownerNameFromHex || undefined, 
               color: memberToColorMap.get(normalizedAddr)!
             });
           }
@@ -238,98 +355,343 @@ const SettlingMapPage: React.FC = () => {
       }
     });
     return Array.from(uniqueMembers.values()).sort((a,b) => (a.name || a.address).localeCompare(b.name || b.address));
-  }, [mapData, guildMembers, memberToColorMap, memberAddressToUsernameMap]); 
+  }, [settleRealmData, guildMembers, memberToColorMap, memberAddressToUsernameMap]); // Updated dependencies
 
-  useEffect(() => {
-    const fetchMapAndMemberData = async () => {
-      setLoading(true);
-      setLoadingMembers(true);
-      try {
-        // Fetch map data
-        const mapResponse = await fetch('/eternum_settlement_map_data.json');
-        if (!mapResponse.ok) {
-          throw new Error(`Failed to fetch map data: ${mapResponse.status} ${mapResponse.statusText}`);
-        }
-        const mapJsonData: MapData = await mapResponse.json();
-        setMapData(mapJsonData);
+  // New function to encapsulate data fetching
+  const fetchMapData = async () => {
+    console.log("[SettlingMapPage] Fetching map data..."); // Log start of fetch
+    setLoading(true);
+    setLoadingMembers(true);
+    setLoadingSettleRealmData(true); 
+    setLoadingRealmResources(true); 
+    setError(null); // Clear previous errors on new fetch
 
-        // Fetch member data
-        const memberResponse = await fetch('/api/members');
-        if (!memberResponse.ok) {
-          console.error('Failed to fetch guild members:', memberResponse.statusText);
-          setGuildMembers([]); 
-        } else {
-          const membersJsonData: Member[] = await memberResponse.json();
-          setGuildMembers(membersJsonData); // Store full member objects
-          console.log("[SettlingMapPage] Fetched guildMembers:", membersJsonData); // Updated LOG 1
-        }
+    try {
+      // Fetch map data, member data, SettleRealmData, and RealmResources in parallel
+      const [mapResponse, memberResponse, settleRealmResponse, realmResourceResponse] = await Promise.all([
+        fetch('/eternum_all_locations.json'),
+        fetch('/api/members'),
+        fetch(`${process.env.NEXT_PUBLIC_GAME_DATA_SQL}?query=select+*+%0Afrom+%22s1_eternum-SettleRealmData%22`),
+        fetch("/api/realms") // Fetch realm resource data
+      ]);
 
-      } catch (err: unknown) {
-        console.error("Error fetching data:", err);
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
-      } finally {
-        setLoading(false);
-        setLoadingMembers(false);
+      // Process Map Data
+      if (!mapResponse.ok) {
+        throw new Error(`Failed to fetch map data: ${mapResponse.status} ${mapResponse.statusText}`);
       }
-    };
+      const mapJsonData: MapData = await mapResponse.json();
+      setMapData(mapJsonData);
 
-    fetchMapAndMemberData();
+      // Process Member Data
+      if (!memberResponse.ok) {
+        console.error('Failed to fetch guild members:', memberResponse.statusText);
+        setGuildMembers([]); 
+      } else {
+        const membersJsonData: Member[] = await memberResponse.json();
+        setGuildMembers(membersJsonData); 
+      }
+
+      // Process SettleRealmData
+      if (!settleRealmResponse.ok) {
+        console.error('Failed to fetch SettleRealmData:', settleRealmResponse.statusText);
+        setSettleRealmData([]); // Set empty on error
+      } else {
+        const settleRealmJsonData: SettleRealmInfo[] = await settleRealmResponse.json();
+        setSettleRealmData(settleRealmJsonData);
+        console.log(`[SettlingMapPage] Fetched ${settleRealmJsonData.length} SettleRealmData entries.`);
+      }
+
+      // Process Realm Resource Data
+      if (!realmResourceResponse.ok) {
+        console.error('Failed to fetch Realm Resource Data:', realmResourceResponse.statusText);
+        setRealmResourceData([]); 
+      } else {
+        const realmResourcesJsonData = await realmResourceResponse.json(); // Parse first
+        // Add check: Ensure the parsed data is an array
+        if (Array.isArray(realmResourcesJsonData)) {
+          setRealmResourceData(realmResourcesJsonData as RealmResourceInfo[]); // Type assertion is safer now
+          console.log(`[SettlingMapPage] Fetched ${realmResourcesJsonData.length} Realm Resource entries.`);
+        } else {
+          console.error('Realm Resource Data fetched is not an array:', realmResourcesJsonData);
+          setRealmResourceData([]); // Default to empty array if not an array
+        }
+      }
+
+    } catch (err: unknown) {
+      console.error("Error fetching data:", err);
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+    } finally {
+      setLoading(false);
+      setLoadingMembers(false);
+      setLoadingSettleRealmData(false); 
+      setLoadingRealmResources(false); 
+      console.log("[SettlingMapPage] Finished fetching map data."); // Log end of fetch
+    }
+  };
+
+  // Initial data fetch on component mount
+  useEffect(() => {
+    fetchMapData();
   }, []);
 
-  const viewBox = useMemo(() => {
-    if (!mapData) return '0 0 1000 1000';
+  // Set up interval for refreshing data every 5 minutes
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      console.log("[SettlingMapPage] Refreshing map data via interval...");
+      fetchMapData(); // Call the fetch function
+    }, 300000); // 5 minutes in milliseconds (5 * 60 * 1000)
+
+    // Cleanup function to clear the interval when the component unmounts
+    return () => clearInterval(intervalId);
+  }, []); // Empty dependency array ensures this effect runs only once on mount
+
+  // Calculate the base viewbox needed to contain all elements
+  const baseViewBox = useMemo(() => {
+    if (!mapData) return null;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     
     const pointsToConsider: { normalizedX: number; normalizedY: number }[] = [];
     mapData.allPotentialSpots.forEach(s => pointsToConsider.push({normalizedX: s.normalizedX, normalizedY: s.normalizedY}));
     mapData.banks.forEach(b => pointsToConsider.push({normalizedX: b.normalizedX, normalizedY: b.normalizedY}));
-    if (mapData.center) { // Assuming mapData.center.x and .y are normalized coords
+    if (mapData.center) {
         pointsToConsider.push({normalizedX: mapData.center.x, normalizedY: mapData.center.y});
     }
 
-    if (pointsToConsider.length === 0) return '0 0 1000 1000';
+    if (pointsToConsider.length === 0) return { x: 0, y: 0, width: 1000, height: 1000 }; // Default base
 
     pointsToConsider.forEach(spot => {
+      // Include hexagon dimensions for bounds calculation
       minX = Math.min(minX, spot.normalizedX - HEX_SIZE);
-      minY = Math.min(minY, spot.normalizedY - HEX_SIZE);
+      minY = Math.min(minY, spot.normalizedY - HEX_SIZE); 
       maxX = Math.max(maxX, spot.normalizedX + HEX_SIZE);
       maxY = Math.max(maxY, spot.normalizedY + HEX_SIZE);
     });
-    const padding = HEX_SIZE * 10; // Generous padding
-    const width = maxX - minX + padding * 2;
-    const height = maxY - minY + padding * 2;
-    const finalWidth = Math.max(width, HEX_SIZE * 40);
-    const finalHeight = Math.max(height, HEX_SIZE * 40);
-    return `${minX - padding} ${minY - padding} ${finalWidth} ${finalHeight}`;
+
+    const padding = HEX_SIZE * 10; // Base padding
+    const width = Math.max(maxX - minX + padding * 2, HEX_SIZE * 40); // Ensure minimum width
+    const height = Math.max(maxY - minY + padding * 2, HEX_SIZE * 40); // Ensure minimum height
+    const x = minX - padding;
+    const y = minY - padding;
+
+    return { x, y, width, height };
   }, [mapData]);
 
-  const handleHexClick = (hexData: HexSpot | MapCenter, type: string) => {
-    const normalizedOwnerAddress = 'ownerAddress' in hexData ? normalizeAddress(hexData.ownerAddress) : undefined;
+  // Calculate the current viewBox string based on zoom level
+  const currentViewBox = useMemo(() => {
+    if (!baseViewBox) return '0 0 1000 1000'; // Default if base isn't calculated
+
+    const { x: baseX, y: baseY, width: baseWidth, height: baseHeight } = baseViewBox;
+
+    // Center of the base view
+    const centerX = baseX + baseWidth / 2;
+    const centerY = baseY + baseHeight / 2;
+
+    // Calculate zoomed dimensions
+    const zoomedWidth = baseWidth / zoomLevel;
+    const zoomedHeight = baseHeight / zoomLevel;
+
+    // Calculate the top-left corner, adjusting for both zoom and pan offset
+    const currentMinX = centerX - zoomedWidth / 2 + viewBoxOffset.x;
+    const currentMinY = centerY - zoomedHeight / 2 + viewBoxOffset.y;
+
+    return `${currentMinX} ${currentMinY} ${zoomedWidth} ${zoomedHeight}`;
+  }, [baseViewBox, zoomLevel, viewBoxOffset]);
+
+  // Zoom Handlers
+  const handleZoomIn = () => {
+    setZoomLevel(prevZoom => Math.min(prevZoom * 1.2, 5)); // Zoom in, max 5x
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel(prevZoom => Math.max(prevZoom / 1.2, 0.5)); // Zoom out, min 0.5x
+  };
+
+  // --- Panning Handlers wrapped in useCallback --- 
+  const handlePanStart = (e: React.MouseEvent<SVGSVGElement> | React.TouchEvent<SVGSVGElement>) => {
+    e.preventDefault(); // Prevent default drag behavior (like image saving)
+    setIsDragging(true);
+    const currentPos = 'touches' in e ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY };
+    setStartDragPos(currentPos);
+    setInitialViewBoxOffset(viewBoxOffset); // Store the offset at the start of the drag
+  };
+
+  const handlePanMove = useCallback((e: MouseEvent | TouchEvent) => {
+    if (!isDragging || !svgRef.current || !baseViewBox) return;
+    e.preventDefault(); // Prevent scrolling during drag
+
+    const currentPos = 'touches' in e ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY };
+    const dx = currentPos.x - startDragPos.x;
+    const dy = currentPos.y - startDragPos.y;
+
+    // Convert screen pixel difference to SVG coordinate difference
+    const svgRect = svgRef.current.getBoundingClientRect();
+    const { width: baseWidth, height: baseHeight } = baseViewBox; // Use base dimensions
+    const zoomedWidth = baseWidth / zoomLevel;
+    const zoomedHeight = baseHeight / zoomLevel;
+
+    // Calculate scaling factor
+    const scaleX = zoomedWidth / svgRect.width;
+    const scaleY = zoomedHeight / svgRect.height;
+
+    const svgDx = dx * scaleX;
+    const svgDy = dy * scaleY;
+
+    // Calculate new potential offset
+    let newOffsetX = initialViewBoxOffset.x - svgDx;
+    let newOffsetY = initialViewBoxOffset.y - svgDy;
+
+    // --- Corrected Boundary Calculation ---
+    const limitX = Math.max(0, (baseWidth - zoomedWidth) / 2); 
+    const limitY = Math.max(0, (baseHeight - zoomedHeight) / 2);
+
+    newOffsetX = Math.max(-limitX, Math.min(limitX, newOffsetX));
+    newOffsetY = Math.max(-limitY, Math.min(limitY, newOffsetY));
+
+    setViewBoxOffset({ x: newOffsetX, y: newOffsetY });
+  }, [isDragging, svgRef, baseViewBox, startDragPos, zoomLevel, initialViewBoxOffset]); // Added dependencies
+
+  const handlePanEnd = useCallback(() => {
+    if (isDragging) {
+      setIsDragging(false);
+    }
+  }, [isDragging]); // Added dependency
+
+  // Effect to add/remove window event listeners for panning
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handlePanMove);
+      window.addEventListener('touchmove', handlePanMove, { passive: false }); // passive: false to allow preventDefault
+      window.addEventListener('mouseup', handlePanEnd);
+      window.addEventListener('touchend', handlePanEnd);
+      window.addEventListener('mouseleave', handlePanEnd); // Stop drag if mouse leaves window
+    }
+
+    // Cleanup function
+    return () => {
+      window.removeEventListener('mousemove', handlePanMove);
+      window.removeEventListener('touchmove', handlePanMove);
+      window.removeEventListener('mouseup', handlePanEnd);
+      window.removeEventListener('touchend', handlePanEnd);
+      window.removeEventListener('mouseleave', handlePanEnd);
+    };
+  }, [isDragging, handlePanMove, handlePanEnd]); // Dependencies now stable
+
+  // Function to reset pan and optionally zoom
+  const handleCenterMap = () => {
+    setViewBoxOffset({ x: 0, y: 0 });
+    // Optionally reset zoom as well:
+    // setZoomLevel(1);
+  };
+
+  // MODIFIED handleHexClick to work with new data structure from occupiedSpotsRenderData
+  const handleHexClick = (hexData: HexSpot | SettleRealmInfo | MapCenter, type: string) => {
+    if (isDragging) return;
+    console.log("--- handleHexClick Start ---");
+    console.log("Clicked hexData:", hexData);
+    console.log("Clicked type:", type);
+
+    let currentSettleInfo: SettleRealmInfo | undefined = undefined;
+    let currentPotentialSpotInfo: Partial<HexSpot> = {};
+    let normalizedX: number, normalizedY: number;
+    let contractX: number | undefined, contractY: number | undefined;
+    let ownerAddressFromData: string | undefined;
+
+    if (type === 'Occupied Spot') {
+      // For Occupied Spot, hexData is a merged object of potentialSpot & settleInfo
+      // from renderSpot.originalData. SettleRealmInfo fields (x, y, owner_address etc.) are directly available.
+      currentSettleInfo = hexData as SettleRealmInfo; // It contains all SettleRealmInfo fields
+      currentPotentialSpotInfo = hexData as HexSpot; // It also contains HexSpot fields like normalizedX/Y
+      
+      normalizedX = currentPotentialSpotInfo.normalizedX!;
+      normalizedY = currentPotentialSpotInfo.normalizedY!;
+      contractX = currentSettleInfo.x; // from SettleRealmInfo
+      contractY = currentSettleInfo.y; // from SettleRealmInfo
+      ownerAddressFromData = currentSettleInfo.owner_address;
+
+    } else if ('normalizedX' in hexData && 'normalizedY' in hexData) { // Potential Spot or Bank
+      currentPotentialSpotInfo = hexData as HexSpot;
+      normalizedX = currentPotentialSpotInfo.normalizedX ?? 0; // Provide fallback
+      normalizedY = currentPotentialSpotInfo.normalizedY ?? 0; // Provide fallback
+      contractX = currentPotentialSpotInfo.originalContractX;
+      contractY = currentPotentialSpotInfo.originalContractY;
+      ownerAddressFromData = currentPotentialSpotInfo.ownerAddress; // Banks/etc might have this if ever assigned
+      // For non-occupied, try to find settleInfo if it exists (e.g., a wonder that is not occupied by a guild member)
+      if (contractX !== undefined && contractY !== undefined) {
+        currentSettleInfo = settleRealmMap.get(`${contractX}-${contractY}`);
+      }
+    } else { // Center Tile
+      const centerData = hexData as MapCenter;
+      normalizedX = centerData.x;
+      normalizedY = centerData.y;
+      // Center tile doesn't have originalContractX/Y in the same way
+      // If we need to find SettleInfo for the center, we'd need its contract coords.
+      // For now, assume center won't directly show SettleRealmInfo unless specifically mapped.
+    }
+
+    const normalizedOwnerAddress = normalizeAddress(ownerAddressFromData);
+    console.log("Contract Coords Key for Settle/Realm lookup:", contractX !== undefined && contractY !== undefined ? `${contractX}-${contractY}` : "N/A");
+
+    // Use currentSettleInfo if already identified (especially for Occupied Spots)
+    const settleInfoToUse = currentSettleInfo; 
+    console.log("SettleInfo for display logic:", settleInfoToUse);
+
+    let displayOwnerName = '';
+    if (settleInfoToUse && settleInfoToUse.owner_name) {
+      const convertedName = hexToString(settleInfoToUse.owner_name);
+      if (convertedName) displayOwnerName = convertedName;
+    } 
+    if (!displayOwnerName && normalizedOwnerAddress) {
+        displayOwnerName = memberAddressToUsernameMap.get(normalizedOwnerAddress) || '';
+    }
+    if (!displayOwnerName && currentPotentialSpotInfo.ownerName) { // Fallback to potential spot's original ownerName (e.g. from banks)
+         displayOwnerName = currentPotentialSpotInfo.ownerName;
+    }
+
+    const realmId = settleInfoToUse?.entity_id;
+    console.log("Extracted Realm ID (from entity_id):", realmId);
+
+    const realmInfoFromMongo = realmId ? realmResourceMap.get(realmId) : undefined;
+    console.log("RealmInfo from realmResourceMap:", realmInfoFromMongo);
+
+    let displayRealmName = settleInfoToUse ? hexToString(settleInfoToUse.realm_name) : undefined;
+    if (!displayRealmName && realmInfoFromMongo) {
+      displayRealmName = realmInfoFromMongo.name;
+    }
+
+    let resourcesProducedString = 'N/A';
+    if (realmInfoFromMongo && realmInfoFromMongo.attributes) {
+      const resourceAttributes = realmInfoFromMongo.attributes.filter(attr => attr.trait_type === 'Resource');
+      if (resourceAttributes.length > 0) {
+        resourcesProducedString = resourceAttributes.map(attr => String(attr.value)).sort().join(', ');
+      } else {
+        resourcesProducedString = 'None';
+      }
+    }
+
+    console.log("Determined Realm Name:", displayRealmName);
+    console.log("Determined Resources String:", resourcesProducedString);
 
     const dataForState: SelectedHexData = {
       type: type,
-      normalizedX: 'normalizedX' in hexData ? hexData.normalizedX : hexData.x,
-      normalizedY: 'normalizedY' in hexData ? hexData.normalizedY : hexData.y,
-      ...( 'originalContractX' in hexData && { originalContractX: hexData.originalContractX }),
-      ...( 'originalContractY' in hexData && { originalContractY: hexData.originalContractY }),
-      ...( 'side' in hexData && { side: hexData.side }),
-      ...( 'layer' in hexData && { layer: hexData.layer }),
-      ...( 'point' in hexData && { point: hexData.point }),
-      ...(normalizedOwnerAddress && { ownerAddress: normalizedOwnerAddress }), 
-      ...( 'ownerName' in hexData && hexData.ownerName && { ownerName: hexData.ownerName }),     
+      normalizedX: normalizedX,
+      normalizedY: normalizedY,
+      ...( contractX !== undefined && { originalContractX: contractX }),
+      ...( contractY !== undefined && { originalContractY: contractY }),
+      ...( currentPotentialSpotInfo.side !== undefined && { side: currentPotentialSpotInfo.side }),
+      ...( currentPotentialSpotInfo.layer !== undefined && { layer: currentPotentialSpotInfo.layer }),
+      ...( currentPotentialSpotInfo.point !== undefined && { point: currentPotentialSpotInfo.point }),
+      ownerAddress: normalizedOwnerAddress, 
+      ownerName: displayOwnerName || '-',
+      isWonder: settleInfoToUse ? settleInfoToUse.wonder !== 1 : false, 
+      realmId: realmId, 
+      realmName: displayRealmName || undefined,
+      resourcesProduced: resourcesProducedString
     };
     setSelectedHex(dataForState);
+    console.log("--- handleHexClick End ---");
   };
 
-  // REINSTATED getSelectedHexZoneInfo and selectedZoneInfo
-  const getSelectedHexZoneInfo = () => {
-    if (!selectedHex || selectedHex.originalContractX === undefined || selectedHex.originalContractY === undefined) return null;
-    const zoneInfo = hexToZoneMap.get(`${selectedHex.originalContractX}-${selectedHex.originalContractY}`);
-    return zoneInfo ? zoneInfo : null;
-  };
-  const selectedZoneInfo = getSelectedHexZoneInfo();
-
-  if (loading || loadingMembers) { // Check both loading states
+  if (loading || loadingMembers || loadingSettleRealmData || loadingRealmResources) { // Update loading check
     return <div className="map-loading">Loading Map Data...</div>;
   }
 
@@ -344,25 +706,38 @@ const SettlingMapPage: React.FC = () => {
   return (
     <div className="settling-map-root">
       <div className="map-container">
+        {/* Add Zoom Controls */} 
+        <div className="zoom-controls">
+          <button onClick={handleZoomIn} className="zoom-button">+</button>
+          <button onClick={handleCenterMap} className="center-button">Center</button>
+          <button onClick={handleZoomOut} className="zoom-button">-</button>
+        </div>
         <div className="map-visualization-area">
           {/* Selected Hex Info Panel - now an overlay */}
           {selectedHex && (
             <div className="selected-hex-info-overlay">
-              <h3>Selected: {selectedHex.type}</h3>
-              {/* REINSTATED Zone Name display - simplified */}
-              {selectedZoneInfo && (
-                <p>Zone: {selectedZoneInfo.zoneName}</p>
+              {/* Conditional Rendering based on type */}
+              {selectedHex.type === 'Occupied Spot' ? (
+                <>
+                  <h3>{selectedHex.realmId || 'N/A'} : {selectedHex.realmName || 'Unnamed Realm'}</h3>
+                  <p>Owner: {selectedHex.ownerName}</p>
+                  {selectedHex.isWonder && <p className="wonder-indicator">Status: Wonder!</p>}
+                  <p>Coords: ({selectedHex.normalizedX}, {selectedHex.normalizedY})</p>
+                  <p>Resources: {selectedHex.resourcesProduced || 'N/A'}</p>
+                </>
+              ) : selectedHex.type === 'Bank' || selectedHex.type === 'Center' || selectedHex.type === 'Potential Spot' ? (
+                <> 
+                  {/* Default display for Bank, Center, Potential Spot */}
+                  <h3>{selectedHex.type}</h3>
+                  {selectedHex.side !== undefined && <p>Side, Layer, Point : ({selectedHex.side}, {selectedHex.layer}, {selectedHex.point})</p>}
+                  {selectedHex.normalizedX !== undefined && <p>Normalized X, Y : ({selectedHex.normalizedX}, {selectedHex.normalizedY})</p>}
+                </>
+              ) : (
+                 // Default/fallback case if needed, or render nothing
+                 <p>Details not available for this spot.</p>
               )}
-              {selectedHex.side !== undefined && selectedHex.layer !== undefined && selectedHex.point !== undefined && 
-                <p>Side, Layer, Point : ({selectedHex.side}, {selectedHex.layer}, {selectedHex.point})</p>}
-              {(selectedHex.normalizedX !== undefined && selectedHex.normalizedY !== undefined) && 
-                <p>Normalized X, Y : ({selectedHex.normalizedX}, {selectedHex.normalizedY})</p>}
-              
-              {selectedHex.originalContractX !== undefined && selectedHex.originalContractY !== undefined && 
-               occupiedSpotsSet.has(`${selectedHex.originalContractX}-${selectedHex.originalContractY}`) && 
-                <p>Status: Occupied</p>}
-              {selectedHex.ownerName && <p>Owner: {selectedHex.ownerName}</p>}
-              {selectedHex.ownerAddress && <p>Owner Address: {selectedHex.ownerAddress}</p>}
+              {/* Always show owner address if available for any type EXCEPT Occupied Spot */}
+              {selectedHex.type !== 'Occupied Spot' && selectedHex.ownerAddress && <p>Owner Address: {selectedHex.ownerAddress}</p>}
             </div>
           )}
           {!selectedHex && (
@@ -389,12 +764,18 @@ const SettlingMapPage: React.FC = () => {
             </div>
           )}
 
-          <svg viewBox={viewBox} preserveAspectRatio="xMidYMid meet" className="hexagon-svg">
+          <svg 
+            viewBox={currentViewBox} 
+            preserveAspectRatio="xMidYMid meet" 
+            className={`hexagon-svg ${isDragging ? 'dragging' : ''}`}
+            ref={svgRef}
+            onMouseDown={handlePanStart}
+            onTouchStart={handlePanStart}
+          >
             <g>
-              {/* Layer 1: Base potential spots (default color) */}
+              {/* Layer 1: Base potential spots (default color) - RESTORED */}
               {mapData.allPotentialSpots.map((spot) => {
                 const spotKey = `potential-${spot.layer}-${spot.point}-${spot.originalContractX}-${spot.originalContractY}`;
-                // REMOVED zoneInfo and zone-based fillColor
                 const fillColor = DEFAULT_FILL_COLOR; // Use default for all potential spots
 
                 return (
@@ -412,39 +793,29 @@ const SettlingMapPage: React.FC = () => {
                 );
               })}
 
-              {/* Layer 2: Occupied spots on top of zoned/default spots */}
-              {mapData.allPotentialSpots
-                .filter(spot => occupiedSpotsSet.has(`${spot.originalContractX}-${spot.originalContractY}`))
-                .map((potentialSpot) => {
-                  const spotContractIdentifier = `${potentialSpot.originalContractX}-${potentialSpot.originalContractY}`;
-                  
-                  // Get the full occupied spot data which includes owner info
-                  const occupiedSpotData = occupiedSpotsMap.get(spotContractIdentifier);
-
-                  if (!occupiedSpotData) return null; 
-
+              {/* Layer 2: Occupied spots - Iterates over new occupiedSpotsRenderData */}
+              {occupiedSpotsRenderData.map((renderSpot) => {
+                  // Exclude banks and center tile if they happen to overlap (unlikely but safe)
+                  const spotContractIdentifier = `${renderSpot.originalData.x}-${renderSpot.originalData.y}`;
                   if (bankSpotsSet.has(spotContractIdentifier)) return null; 
-                  if (mapData.center && potentialSpot.normalizedX === mapData.center.x && potentialSpot.normalizedY === mapData.center.y && potentialSpot.layer === 0 && potentialSpot.point === 0) return null;
+                  if (mapData.center && renderSpot.normalizedX === mapData.center.x && renderSpot.normalizedY === mapData.center.y && renderSpot.originalData.layer === 0 && renderSpot.originalData.point === 0) return null;
 
-                  const normalizedOwnerAddress = normalizeAddress(occupiedSpotData.ownerAddress);
-                  let fillColor = OCCUPIED_FILL_COLOR; // Default for occupied
-                  if (normalizedOwnerAddress && memberToColorMap.has(normalizedOwnerAddress)) {
-                    fillColor = memberToColorMap.get(normalizedOwnerAddress)!;
-                  }
+                  const wonderClass = renderSpot.isWonder ? 'wonder-pulse' : '';
 
-                  const spotKey = `occupied-${potentialSpot.layer}-${potentialSpot.point}-${potentialSpot.originalContractX}-${potentialSpot.originalContractY}`;
                   return (
                     <HexagonTile
-                      key={spotKey}
-                      id={spotKey}
-                      x={potentialSpot.normalizedX} // Use potentialSpot for x,y as it's the base rendering position
-                      y={potentialSpot.normalizedY}
+                      key={renderSpot.key}
+                      id={renderSpot.key}
+                      x={renderSpot.normalizedX} 
+                      y={renderSpot.normalizedY}
                       size={HEX_SIZE}
-                      fillColor={fillColor} 
+                      fillColor={renderSpot.fillColor} 
                       strokeColor={STROKE_COLOR}    
                       strokeWidth={HEX_STROKE_WIDTH}
+                      className={wonderClass} // Apply wonder class conditionally
                       onClick={() => {
-                        handleHexClick(occupiedSpotData, 'Occupied Spot');
+                        // Pass the combined original data to the handler
+                        handleHexClick(renderSpot.originalData, 'Occupied Spot');
                       }}
                     />
                   );

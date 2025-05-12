@@ -43,13 +43,18 @@
   justify-content: center;
   align-items: center;
   overflow: auto; /* Allow scrolling if map is larger than container */
-  opacity: 0.85;
+  opacity: 0.85; /* <-- Restored */
 }
 
 .hexagon-svg {
   width: 100%;
   height: 100%;
-  max-height: 70vh; /* Limit map height to prevent excessive page stretching */
+  max-height: 70vh; /* Limit map height */
+  cursor: grab; /* Add grab cursor by default */
+}
+
+.hexagon-svg.dragging {
+  cursor: grabbing; /* Change cursor while dragging */
 }
 
 .hexagon-tile:hover {
@@ -179,4 +184,96 @@
   /* Example: might add a subtle glow */
 }
 
-/* Add any other specific styles you might need for map elements later */ 
+/* Add any other specific styles you might need for map elements later */
+
+/* Zoom Controls Styling */
+.zoom-controls {
+  position: absolute;
+  top: 10px; /* Adjust as needed */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10; /* Ensure buttons are above the map */
+  background-color: rgba(40, 42, 54, 0.7); /* Dark background with transparency */
+  padding: 5px 10px;
+  border-radius: 5px;
+  display: flex;
+  gap: 5px;
+}
+
+.zoom-button {
+  background-color: #6272a4; /* Dracula comment color */
+  color: #f8f8f2; /* Dracula foreground */
+  border: none;
+  border-radius: 3px;
+  padding: 5px 10px;
+  font-size: 1.2em;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.zoom-button:hover {
+  background-color: #bd93f9; /* Dracula purple */
+}
+
+.zoom-button:active {
+  background-color: #ff79c6; /* Dracula pink */
+}
+
+/* Center Button Styling */
+.center-button {
+  background-color: #44475a; /* Dracula current line */
+  color: #f8f8f2; /* Dracula foreground */
+  border: none;
+  border-radius: 3px;
+  padding: 5px 10px;
+  font-size: 0.9em; /* Slightly smaller text */
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.center-button:hover {
+  background-color: #6272a4; /* Dracula comment */
+}
+
+.center-button:active {
+  background-color: #8be9fd; /* Dracula cyan */
+}
+
+/* Wonder Pulse Animation */
+@keyframes pulse {
+  0% {
+    /* transform: scale(1); Removed */
+    opacity: 0.6; /* Changed from 0.85 to 0.6 for more noticeable pulse */
+    stroke-width: calc(var(--base-stroke-width, 0.15) * 1.5); /* Changed from 1x to 1.5x */
+    stroke: #f1fa8c; /* Changed from base-stroke-color to pulse color */
+  }
+  50% {
+    /* transform: scale(1.05); Removed */
+    opacity: 1; /* Still pulse to full opacity */
+    stroke-width: calc(var(--base-stroke-width, 0.15) * 2.5); /* Thicker stroke (keep at 2.5x) */
+    stroke: #f1fa8c; /* Dracula yellow for pulse */
+  }
+  100% {
+    /* transform: scale(1); Removed */
+    opacity: 0.6; /* Changed from 0.85 to 0.6 for more noticeable pulse */
+    stroke-width: calc(var(--base-stroke-width, 0.15) * 1.5); /* Changed from 1x to 1.5x */
+    stroke: #f1fa8c; /* Changed from base-stroke-color to pulse color */
+  }
+}
+
+.wonder-pulse {
+  animation: pulse 2s infinite ease-in-out;
+  /* Set CSS variables for the animation to use base values */
+  --base-stroke-width: 0.15; 
+  --base-stroke-color: #212529;
+  /* transform-origin: center; Removed as scale is removed */
+}
+
+/* Optional: Style for the wonder indicator text in the info panel */
+.wonder-indicator {
+  color: #f1fa8c; /* Dracula yellow */
+  font-weight: bold;
+  margin-left: 5px;
+} 

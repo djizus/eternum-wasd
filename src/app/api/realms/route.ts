@@ -23,8 +23,17 @@ export async function GET(request: Request) {
         return NextResponse.json({});
       }
       // Create a new object excluding the _id property
-      const { _id: __id, ...realmsWithoutId } = allRealmsDoc;
-      return NextResponse.json(realmsWithoutId);
+      const { _id: __id, ...realmsObject } = allRealmsDoc;
+      
+      // Transform the object into an array
+      const realmsArray = Object.entries(realmsObject).map(([idStr, realmData]) => ({
+        id: parseInt(idStr, 10), // Parse string ID to number
+        name: realmData.name,
+        attributes: realmData.attributes,
+        // Add other necessary fields if needed
+      }));
+      
+      return NextResponse.json(realmsArray); // Return the transformed array
     }
   } catch (error) {
     console.error('Error in realms API:', error);

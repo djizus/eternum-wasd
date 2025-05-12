@@ -1,20 +1,18 @@
-import NextAuth, { type Account, type Profile, type User, type NextAuthOptions, type Session } from "next-auth";
+import NextAuth, { /* type Account, type Profile, */ type User, type NextAuthOptions, type Session } from "next-auth";
 import type { JWT } from "next-auth/jwt"; // Import JWT type for token augmentation
 import DiscordProvider from "next-auth/providers/discord";
 import { getDatabase } from "@/lib/mongodb"; // Added import for MongoDB
-import { type Db, type Collection } from 'mongodb'; // Removed unused MongoClient
+// import { type Db, type Collection } from 'mongodb'; // REMOVED unused MongoClient
 
 // Augment NextAuth types
 declare module "next-auth" {
   interface Session {
     accessToken?: string;
-    user?: User & {
+    user?: User & { // 'User' is still used here
       id?: string | null; // Allow id to be string or null
     };
   }
-  interface User {
-    id?: string | null; // Add id to the default User type
-  }
+  // Removed duplicate User augmentation
 }
 
 declare module "next-auth/jwt" {
@@ -26,21 +24,10 @@ declare module "next-auth/jwt" {
   }
 }
 
-// Define the structure for the user document in MongoDB
-interface DiscordUserDocument {
-  discord_id: string;
-  username?: string | null;
-  email?: string | null;
-  image?: string | null;
-  profile?: Profile | null; // Store the raw Discord profile
-  first_login_at: Date;
-  last_login_at: Date;
-  login_history: Array<{
-    timestamp: Date;
-    account_details: Partial<Account> | null; // Use Partial<Account> instead of any
-  }>;
-  // Add any other fields you want to track
-}
+// REMOVED Unused DiscordUserDocument interface
+// interface DiscordUserDocument {
+//   ...
+// }
 
 // Define the structure of the Discord Guild object from their API
 // interface DiscordGuild { // No longer needed as guild check is removed
@@ -115,54 +102,33 @@ const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     // Add types for parameters: User, Account, Profile (optional)
-    async signIn({ user, account, profile }: { user: User, account: Account | null, profile?: Profile | undefined }) {
-      if (account?.provider === "discord" && user?.id) {
-        console.log("Discord sign-in attempt for user:", user.name, user.id, user.email);
-
-        // Log user information to MongoDB
-        try {
-          const db: Db = await getDatabase(); // Specify Db type
-          const usersCollection: Collection<DiscordUserDocument> = db.collection<DiscordUserDocument>("discord_users");
-          
-          const currentDate = new Date();
-
-          await usersCollection.updateOne(
-            { discord_id: user.id },
-            { 
-              $set: { 
-                username: user.name,
-                email: user.email, // Make sure email scope is requested
-                image: user.image,
-                profile: profile, 
-                last_login_at: currentDate
-              },
-              $push: { 
-                login_history: { 
-                  $each: [{ timestamp: currentDate, account_details: account ? { ...account } : null  }], // Spread account to ensure it's a plain object if not null
-                  $slice: -10 
-                } // Removed the 'as any' here, relying on correct typing of DiscordUserDocument
-              },
-              $setOnInsert: { discord_id: user.id, first_login_at: currentDate } 
-            },
-            { upsert: true }
-          );
-          console.log(`User ${user.id} (${user.name}) data logged/updated in MongoDB.`);
-        } catch (error) {
-          console.error("Error logging Discord user to MongoDB:", error);
-          // Decide if this should prevent login. For now, we allow login even if DB log fails.
-        }
-
-        // Removed guild check and DISCORD_MEMBERS_ID check.
-        // Anyone who successfully authenticates with Discord is allowed.
-        console.log(`User ${user.id} (${user.name}) authenticated with Discord. Allowing sign in.`);
-        return true;
-
+    async signIn({ user, account, email, credentials }) {
+      console.log("signIn callback", { user, account, email, credentials });
+      // Check if the user's address is in the guild members list
+      if (!account || !account.providerAccountId) {
+        console.error("Provider account ID is missing");
+        return false; // Deny sign-in if address is missing
       }
-      // If not Discord provider or some preliminary issue, default to deny.
-      console.log(`Sign-in attempt not processed by Discord check (provider: ${account?.provider}). Denying.`);
-      return false;
+      const userAddress = account.providerAccountId;
+      
+      try {
+        const db = await getDatabase();
+        const collection = db.collection('members');
+        const member = await collection.findOne({ address: { $regex: new RegExp(`^${userAddress}$`, 'i') } });
+        
+        if (member) {
+          console.log("Guild member verified:", userAddress);
+          return true; // Allow sign-in
+        } else {
+          console.log("User is not a guild member:", userAddress);
+          return '/unauthorized'; // Redirect non-members
+        }
+      } catch (error) {
+        console.error("Error verifying guild member:", error);
+        return false; // Deny sign-in on error
+      }
     },
-    async jwt({ token, user, account, profile }) {
+    async jwt({ token, user, account /*, profile */ }) { // Removed profile
       if (account && user) { 
         token.accessToken = account.access_token;
         token.userId = user.id; 
