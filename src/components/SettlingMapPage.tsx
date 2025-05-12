@@ -827,6 +827,8 @@ const SettlingMapPage: React.FC = () => {
                 const spotKey = `potential-${spot.layer}-${spot.point}-${spot.originalContractX}-${spot.originalContractY}`;
                 const fillColor = DEFAULT_FILL_COLOR; // Use default for all potential spots
 
+                const isSelected = selectedHex && spot.normalizedX === selectedHex.normalizedX && spot.normalizedY === selectedHex.normalizedY;
+
                 return (
                   <HexagonTile
                     key={spotKey}
@@ -838,6 +840,7 @@ const SettlingMapPage: React.FC = () => {
                     strokeColor={STROKE_COLOR}
                     strokeWidth={HEX_STROKE_WIDTH}
                     onClick={() => handleHexClick(spot, 'Potential Spot')}
+                    className={isSelected ? 'selected-hex-highlight' : ''}
                   />
                 );
               })}
@@ -849,7 +852,9 @@ const SettlingMapPage: React.FC = () => {
                   if (bankSpotsSet.has(spotContractIdentifier)) return null; 
                   if (mapData.center && renderSpot.normalizedX === mapData.center.x && renderSpot.normalizedY === mapData.center.y && renderSpot.originalData.layer === 0 && renderSpot.originalData.point === 0) return null;
 
+                  const isSelected = selectedHex && renderSpot.normalizedX === selectedHex.normalizedX && renderSpot.normalizedY === selectedHex.normalizedY;
                   const wonderClass = renderSpot.isWonder ? 'wonder-pulse' : '';
+                  const combinedClassName = `${wonderClass} ${isSelected ? 'selected-hex-highlight' : ''}`.trim();
 
                   return (
                     <HexagonTile
@@ -861,7 +866,7 @@ const SettlingMapPage: React.FC = () => {
                       fillColor={renderSpot.fillColor} 
                       strokeColor={STROKE_COLOR}    
                       strokeWidth={HEX_STROKE_WIDTH}
-                      className={wonderClass} // Apply wonder class conditionally
+                      className={combinedClassName} // Apply wonder and selected class conditionally
                       onClick={() => {
                         // Pass the combined original data to the handler
                         handleHexClick(renderSpot.originalData, 'Occupied Spot');
@@ -873,6 +878,8 @@ const SettlingMapPage: React.FC = () => {
               {/* Layer 3: Banks (rendered separately and on top of potential/occupied) */}
               {mapData.banks.map((bank, index) => {
                  const bankKey = `bank-${index}-${bank.originalContractX}-${bank.originalContractY}`;
+                 const isSelected = selectedHex && bank.normalizedX === selectedHex.normalizedX && bank.normalizedY === selectedHex.normalizedY;
+                 const combinedClassName = `bank-tile ${isSelected ? 'selected-hex-highlight' : ''}`.trim();
                 return (
                   <HexagonTile
                     key={bankKey}
@@ -884,25 +891,31 @@ const SettlingMapPage: React.FC = () => {
                     strokeColor={BANK_STROKE_COLOR}
                     strokeWidth={SPECIAL_TILE_STROKE_WIDTH}
                     onClick={() => handleHexClick(bank, 'Bank')}
-                    className='bank-tile' // For specific CSS if needed
+                    className={combinedClassName} // Add selected class conditionally
                   />
                 );
               })}
 
               {/* Layer 4: Center Tile (rendered last to be on top of everything) */}
               {mapData.center && (
-                <HexagonTile
-                  key="center-tile"
-                  id="center-tile"
-                  x={mapData.center.x} // Assumes these are normalized renderable coordinates
-                  y={mapData.center.y}
-                  size={HEX_SIZE * 1.15} // Slightly larger center tile
-                  fillColor={CENTER_TILE_FILL_COLOR}
-                  strokeColor={CENTER_TILE_STROKE_COLOR}
-                  strokeWidth={SPECIAL_TILE_STROKE_WIDTH * 1.1}
-                  onClick={() => handleHexClick(mapData.center, 'Center')}
-                  className='center-tile' // For specific CSS if needed
-                />
+                (() => { // IIFE to calculate isSelected for center
+                  const isSelected = selectedHex && mapData.center.x === selectedHex.normalizedX && mapData.center.y === selectedHex.normalizedY;
+                  const combinedClassName = `center-tile ${isSelected ? 'selected-hex-highlight' : ''}`.trim();
+                  return (
+                    <HexagonTile
+                      key="center-tile"
+                      id="center-tile"
+                      x={mapData.center.x} // Assumes these are normalized renderable coordinates
+                      y={mapData.center.y}
+                      size={HEX_SIZE * 1.15} // Slightly larger center tile
+                      fillColor={CENTER_TILE_FILL_COLOR}
+                      strokeColor={CENTER_TILE_STROKE_COLOR}
+                      strokeWidth={SPECIAL_TILE_STROKE_WIDTH * 1.1}
+                      onClick={() => handleHexClick(mapData.center, 'Center')}
+                      className={combinedClassName} // Add selected class conditionally
+                    />
+                  );
+                })()
               )}
             </g>
           </svg>

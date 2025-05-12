@@ -63,6 +63,19 @@
   opacity: 0.85;
 }
 
+/* Highlight style for the selected hexagon */
+.selected-hex-highlight {
+  stroke: #8be9fd; /* Dracula cyan - Changed from yellow */
+  stroke-width: 0.6; /* Thicker than banks/center */
+  stroke-opacity: 1;
+  /* Prevent hover style from overriding selected style */
+  &:hover {
+    stroke: #8be9fd; /* Dracula cyan - Changed from yellow */
+    stroke-width: 0.6;
+    opacity: 1;
+  }
+}
+
 .selected-hex-info-overlay {
   position: absolute;
   top: 15px;
