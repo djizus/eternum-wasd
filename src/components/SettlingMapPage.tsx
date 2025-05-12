@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import './SettlingMapPage.css'; // We'll create this CSS file next
 import HexagonTile from './HexagonTile'; // Import the new component
 import type { ResourceDefinition } from '../types/resources'; // Import ResourceDefinition
-import { getResourceDefinitionFromName } from '../types/resources'; // Import lookup function
+import { getResourceDefinitionFromName, RESOURCE_DEFINITIONS, EXCLUDED_RESOURCES } from '../types/resources'; // Import lookup, definitions, and exclusions
 
 // Define interfaces based on your JSON structure (can be expanded later)
 interface MapCenter {
@@ -214,6 +214,10 @@ const SettlingMapPage: React.FC = () => {
   // Add state for Realm Resource data
   const [realmResourceData, setRealmResourceData] = useState<RealmResourceInfo[]>([]);
   const [loadingRealmResources, setLoadingRealmResources] = useState<boolean>(true);
+  // --- New State for Layers ---
+  const [selectedLayer, setSelectedLayer] = useState<'guild' | 'resource'>('guild');
+  const [selectedResourceHighlight, setSelectedResourceHighlight] = useState<string | null>('Dragonhide'); // Default to Dragonhide
+  // ---------------------------
 
   // Ref for the SVG element
   const svgRef = useRef<SVGSVGElement>(null);
@@ -273,6 +277,9 @@ const SettlingMapPage: React.FC = () => {
     return map;
   }, [realmResourceData]);
 
+  // Define highlight color constant
+  const RESOURCE_HIGHLIGHT_COLOR = '#2ecc71'; // Green color
+
   // New: Create a lookup map for potential spots based on original contract coords
   const potentialSpotsMap = useMemo(() => {
     if (!mapData) return new Map<string, HexSpot>();
@@ -295,10 +302,38 @@ const SettlingMapPage: React.FC = () => {
       // Only include if it corresponds to a known potential spot
       if (potentialSpot) {
         const normalizedOwnerAddress = normalizeAddress(settleInfo.owner_address);
-        let fillColor = OCCUPIED_FILL_COLOR; // Default for occupied
-        if (normalizedOwnerAddress && memberToColorMap.has(normalizedOwnerAddress)) {
-          fillColor = memberToColorMap.get(normalizedOwnerAddress)!;
+        let fillColor = DEFAULT_FILL_COLOR; // Start with default grey
+
+        // Determine fill color based on the selected layer
+        if (selectedLayer === 'guild') {
+          // Guild layer: Use member color or default occupied color
+          if (normalizedOwnerAddress && memberToColorMap.has(normalizedOwnerAddress)) {
+            fillColor = memberToColorMap.get(normalizedOwnerAddress)!;
+          } else {
+            fillColor = OCCUPIED_FILL_COLOR; // Non-guild member occupied color
+          }
+        } else if (selectedLayer === 'resource' && selectedResourceHighlight) {
+          // Resource layer: Check if the realm produces the highlighted resource
+          const realmInfo = realmResourceMap.get(hexToString(settleInfo.realm_name));
+          let producesResource = false;
+          if (realmInfo && realmInfo.resources) {
+            if (typeof realmInfo.resources[0] === 'string') {
+              producesResource = (realmInfo.resources as unknown as string[]).includes(selectedResourceHighlight);
+            } else if (typeof realmInfo.resources[0] === 'object') {
+              producesResource = (realmInfo.resources as ResourceDefinition[]).some(r => r.name === selectedResourceHighlight);
+            }
+          }
+
+          if (producesResource) {
+            fillColor = RESOURCE_HIGHLIGHT_COLOR; // Highlight color if resource is present
+          } else {
+            fillColor = DEFAULT_FILL_COLOR; // Default grey if not producing resource
+          }
+        } else {
+          // Default case (e.g., resource layer selected but no resource chosen)
+          fillColor = DEFAULT_FILL_COLOR;
         }
+
         const isWonder = settleInfo.wonder !== 1;
 
         renderData.push({
@@ -313,7 +348,7 @@ const SettlingMapPage: React.FC = () => {
       }
     }
     return renderData;
-  }, [mapData, settleRealmData, potentialSpotsMap, memberToColorMap]); // Dependencies
+  }, [mapData, settleRealmData, potentialSpotsMap, memberToColorMap, selectedLayer, selectedResourceHighlight, realmResourceMap]); // Dependencies
 
   // MODIFIED: Member Legend now uses settleRealmData
   const coloredMembersForLegend = useMemo(() => {
@@ -720,7 +755,10 @@ const SettlingMapPage: React.FC = () => {
   return (
     <div className="settling-map-root">
       <div className="map-container">
-        {/* Add Zoom Controls */} 
+        {/* Control Panel Overlay - REMOVED */}
+        {/* <div className="map-controls-overlay"> ... </div> */}
+        
+        {/* Zoom Controls (keep separate for now) */}
         <div className="zoom-controls">
           <button onClick={handleZoomIn} className="zoom-button">+</button>
           <button onClick={handleCenterMap} className="center-button">Center</button>
@@ -773,24 +811,6 @@ const SettlingMapPage: React.FC = () => {
              <div className="selected-hex-info-overlay placeholder">
                 <p>Click on a hexagon to see its details.</p>
              </div>
-          )}
-
-          {/* Member Color Legend */}
-          {coloredMembersForLegend.length > 0 && (
-            <div className="member-legend-overlay">
-              <h4>Member Colors</h4>
-              <ul>
-                {coloredMembersForLegend.map(member => (
-                  <li key={member.address}>
-                    <span 
-                      className="legend-color-swatch"
-                      style={{ backgroundColor: member.color }}
-                    ></span>
-                    {member.name || `${member.address.substring(0, 6)}...${member.address.substring(member.address.length - 4)}`}
-                  </li>
-                ))}
-              </ul>
-            </div>
           )}
 
           <svg 
@@ -887,6 +907,78 @@ const SettlingMapPage: React.FC = () => {
             </g>
           </svg>
         </div>
+      </div>
+
+      {/* Combined Display Options + Legend Overlay */}
+      <div className="map-display-options-overlay">
+        {/* Layer Selection Controls */}
+        <div className="control-section">
+          {/* Layer Selection Radio Buttons */}
+          <div className="control-group">
+            <label className="control-label">Display Layer:</label>
+            <div className="radio-group">
+              <label>
+                <input 
+                  type="radio" 
+                  name="layer" 
+                  value="guild" 
+                  checked={selectedLayer === 'guild'}
+                  onChange={() => setSelectedLayer('guild')}
+                /> Member Colors
+              </label>
+              <label>
+                <input 
+                  type="radio" 
+                  name="layer" 
+                  value="resource" 
+                  checked={selectedLayer === 'resource'}
+                  onChange={() => setSelectedLayer('resource')}
+                /> Resource Search
+              </label>
+            </div>
+          </div>
+
+          {/* Resource Selection Dropdown (Conditional) */}
+          {selectedLayer === 'resource' && (
+            <div className="control-group">
+              <label htmlFor="resourceSelect" className="control-label">Highlight Resource:</label>
+              <select 
+                id="resourceSelect"
+                value={selectedResourceHighlight || ''}
+                onChange={(e) => setSelectedResourceHighlight(e.target.value || null)}
+                className="control-select"
+              >
+                <option value="">-- Select Resource --</option>
+                {RESOURCE_DEFINITIONS
+                  .filter(def => def.rarity !== 'troop') // Exclude troops
+                  .filter(def => !EXCLUDED_RESOURCES.includes(def.name)) // Exclude based on the list from resources.ts
+                  .sort((a, b) => a.id - b.id) // Sort by ID
+                  .map(def => (
+                    <option key={def.id} value={def.name}>{def.name}</option>
+                  ))
+                }
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* Member Color Legend (Conditionally Rendered) */}
+        {selectedLayer === 'guild' && coloredMembersForLegend.length > 0 && (
+          <div className="legend-section">
+            <h5 className="legend-title">Member Colors</h5>
+            <ul>
+              {coloredMembersForLegend.map(member => (
+                <li key={member.address}>
+                  <span 
+                    className="legend-color-swatch"
+                    style={{ backgroundColor: member.color }}
+                  ></span>
+                  {member.name || `${member.address.substring(0, 6)}...${member.address.substring(member.address.length - 4)}`}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );
