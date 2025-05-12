@@ -83,7 +83,7 @@ interface RealmResourceInfo { // Aligning with the structure from loadRealms /ap
 }
 // --- End Updated Type ---
 
-const HEX_SIZE = 4; // Reduced from 10 to 4, further adjustment may be needed
+const HEX_SIZE = 5; // Increased slightly to reduce visual gaps
 const DEFAULT_FILL_COLOR = '#44475a'; // A slightly lighter dark grey
 const OCCUPIED_FILL_COLOR = '#8B0000'; // Darker Red (Maroon/DarkRed)
 const BANK_FILL_COLOR = '#f8f9fa';    // Very light grey / off-white for Banks
