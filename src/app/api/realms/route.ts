@@ -29,8 +29,8 @@ export async function GET(request: Request) {
       const realmsArray = Object.entries(realmsObject).map(([idStr, realmData]) => ({
         id: parseInt(idStr, 10), // Parse string ID to number
         name: realmData.name,
-        attributes: realmData.attributes,
-        // Add other necessary fields if needed
+        owner: realmData.owner,
+        attributes: realmData.attributes
       }));
       
       return NextResponse.json(realmsArray); // Return the transformed array

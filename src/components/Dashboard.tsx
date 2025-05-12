@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { Realm } from '../types/resources';
 import { ResourcesIds } from '../types/resources';
 import { loadRealms } from '../services/realms';
@@ -85,8 +85,51 @@ const Dashboard = () => {
   const [sortBy, setSortBy] = useState<'name' | 'id'>('id');
   const [isProcessingFilters, setIsProcessingFilters] = useState(false);
   const [isRefreshingOwners, setIsRefreshingOwners] = useState(false);
-  const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
   const [filterByGuildMembers, setFilterByGuildMembers] = useState<boolean>(true);
+  const [memberAddressToUsernameMap, setMemberAddressToUsernameMap] = useState<Map<string, string>>(new Map());
+  const [guildMemberAddresses, setGuildMemberAddresses] = useState<Set<string>>(new Set());
+
+  // Define the refresh function using useCallback
+  const refreshOwners = useCallback(async () => {
+    if (isRefreshingOwners) return; // Prevent multiple refreshes at once
+
+    setIsRefreshingOwners(true);
+    console.log('Manual owner refresh triggered');
+    try {
+      // Call the backend API to trigger the update process
+      const updateResponse = await fetch('/api/update-owners', {
+        method: 'POST',
+      });
+
+      if (!updateResponse.ok) {
+        // Try to get error message from response body
+        let errorMsg = `API call failed with status ${updateResponse.status}`;
+        try {
+            const errorData = await updateResponse.json();
+            errorMsg = errorData.error || errorMsg;
+        } catch (_e) { /* ignore json parsing error */ }
+        // REMOVED alert for manual refresh failures
+        // alert(`Error refreshing owners: ${errorMsg}`); 
+        throw new Error(errorMsg); // Still throw to log it
+      }
+
+      const result = await updateResponse.json();
+      console.log('Owner update API response:', result);
+
+      // If update was successful, reload realm data from the primary API
+      console.log('Reloading realm data from /api/realms...');
+      const loadedRealms = await loadRealms(); // Fetches from /api/realms (which reads DB)
+      setRealms(loadedRealms);
+      console.log('Manual refresh complete, data reloaded.');
+
+    } catch (error) {
+      console.error('Error during manual owner refresh:', error);
+      // Error is alerted above if it's an API failure
+    } finally {
+      setIsRefreshingOwners(false);
+    }
+  // Add dependencies for useCallback. loadRealms might be stable if defined outside or memoized.
+  }, [isRefreshingOwners]); 
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -120,19 +163,20 @@ const Dashboard = () => {
   }, []);
 
   // Create a memoized map from lowercase address to username
-  const memberAddressToUsernameMap = useMemo(() => {
+  useEffect(() => {
     const map = new Map<string, string>();
     guildMembersDetails.forEach(member => {
       if (member.address && member.username) {
         map.set(member.address.toLowerCase(), member.username);
       }
     });
-    return map;
+    setMemberAddressToUsernameMap(map);
   }, [guildMembersDetails]);
 
   // Use this map for the guild member filter check as well (more efficient)
-  const guildMemberAddresses = useMemo(() => {
-    return new Set(memberAddressToUsernameMap.keys());
+  useEffect(() => {
+    const addresses = new Set(memberAddressToUsernameMap.keys());
+    setGuildMemberAddresses(addresses);
   }, [memberAddressToUsernameMap]);
 
   // Modify uniqueOwners to create a list of { value: string, label: string } objects
@@ -264,57 +308,6 @@ const Dashboard = () => {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'S1 Passes');
     XLSX.writeFile(workbook, 's1_passes_export.xlsx');
   };
-
-  useEffect(() => {
-    // Define the refresh function
-    const refreshOwners = async () => {
-      if (isRefreshingOwners) return; // Prevent multiple refreshes at once
-      
-      setIsRefreshingOwners(true);
-      console.log('Automatic owner refresh triggered');
-      try {
-        // Call the backend API to trigger the update process
-        const updateResponse = await fetch('/api/update-owners', {
-          method: 'POST',
-        });
-
-        if (!updateResponse.ok) {
-          // Try to get error message from response body
-          let errorMsg = `API call failed with status ${updateResponse.status}`;
-          try {
-              const errorData = await updateResponse.json();
-              errorMsg = errorData.error || errorMsg;
-          } catch (_e) { /* ignore json parsing error */ }
-          throw new Error(errorMsg);
-        }
-
-        const result = await updateResponse.json();
-        console.log('Owner update API response:', result);
-
-        // If update was successful, reload realm data from the primary API
-        console.log('Reloading realm data from /api/realms...');
-        const loadedRealms = await loadRealms(); // Fetches from /api/realms (which reads DB)
-        setRealms(loadedRealms);
-        console.log('Automatic refresh complete, data reloaded.');
-        setLastRefreshTime(new Date());
-
-      } catch (error) {
-        console.error('Error during automatic owner refresh:', error);
-        // We don't show alerts for automatic refresh failures to avoid disrupting UX
-      } finally {
-        setIsRefreshingOwners(false);
-      }
-    };
-
-    // Initial refresh when component mounts
-    refreshOwners();
-    
-    // Set up interval for automatic refresh
-    const refreshInterval = setInterval(refreshOwners, 300000); // 300000 ms = 5 minutes
-    
-    // Clean up interval on component unmount
-    return () => clearInterval(refreshInterval);
-  }, [isRefreshingOwners]); // Added isRefreshingOwners to dependency array
 
   if (loading) {
     return (
@@ -463,15 +456,17 @@ const Dashboard = () => {
             >
               Export to Excel
             </button>
-            <div className="refresh-status">
-              {isRefreshingOwners ? (
-                <span className="refreshing">Refreshing owners...</span>
-              ) : (
-                <span className="last-refresh">
-                  {lastRefreshTime ? `Last refreshed: ${lastRefreshTime.toLocaleTimeString()}` : 'Refreshing...'}
-                </span>
-              )}
-            </div>
+            <button
+              className="refresh-owners-btn"
+              onClick={refreshOwners}
+              disabled={isRefreshingOwners}
+              style={{ marginLeft: '0.5rem', padding: '0.4rem 1rem', borderRadius: '4px', border: 'none', background: '#5cb85c', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
+            >
+              {isRefreshingOwners 
+                ? 'Refreshing...' 
+                : 'Refresh Owners'
+              }
+            </button>
           </div>
         </div>
         <div className="realms-list-wrapper">
