@@ -28,19 +28,16 @@ export const loadRealms = async (): Promise<Realm[]> => {
     const realmEntries = Object.entries(realmsData);
 
     // Map MongoDB data and merge owner from ownerMap - UPDATED
-    console.log("Merging data from MongoDB...");
     const finalRealms = realmEntries.map(([idString, realm]) => {
       const rawRealm = realm as RawRealm; // Assuming RawRealm might contain 'owner'
       const realmId = parseInt(idString, 10);
       // This correctly creates the array of resource name strings
       const resourceNames = rawRealm.resources
-      console.log("Resource names:", resourceNames);
       // Map resource names (string[]) to ResourceDefinition[]
       const resourceDefinitions: ResourceDefinition[] = resourceNames
         .map(name => getResourceDefinitionFromName(name)) // Look up the definition by name
         // Filter out any names that didn't match a definition
         .filter((def): def is ResourceDefinition => def !== undefined);
-      console.log("Resource definitions:", resourceDefinitions);
       
       // Calculate available troops
       const realmResourceNames = new Set(resourceDefinitions.map(def => def.name));
