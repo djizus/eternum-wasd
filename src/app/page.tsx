@@ -1,6 +1,6 @@
 'use client';
 
-import SettlingMapPage from '@/components/SettlingMapPage';
+import LiveMapPage from '@/components/LiveMapPage';
 // We might still need auth checks depending on whether the map is public or not
 // Keeping session check for now, adjust if map should be public
 import { useSession } from 'next-auth/react';
@@ -16,7 +16,7 @@ export default function Home() {
   // Render SettlingMapPage if authenticated, otherwise show login message
   // Modify this logic if the map should be accessible without login
   if (status === 'authenticated') {
-     return <SettlingMapPage />;
+     return <LiveMapPage />;
   }
   
   return (

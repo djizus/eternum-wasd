@@ -27,7 +27,7 @@ const Header: React.FC = () => {
                 href="/" 
                 className={`nav-link ${pathname === '/' ? 'active' : ''}`}
               >
-                Settling Map
+                Live Map
               </Link>
               <Link 
                 href="/season-passes" 

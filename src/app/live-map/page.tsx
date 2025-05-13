@@ -1,6 +1,6 @@
 'use client';
 
-import SettlingMapPage from '@/components/SettlingMapPage';
+import LiveMapPage from '@/components/LiveMapPage';
 import { useSession } from 'next-auth/react';
 import React from 'react';
 
@@ -12,7 +12,7 @@ export default function SettlingMap() {
   }
 
   if (status === 'authenticated') {
-    return <SettlingMapPage />;
+    return <LiveMapPage />;
   }
 
   // Redirect or show message if not authenticated
