@@ -21,8 +21,9 @@ interface HexSpot {
   side: number;      // Meaning to be clarified if important for rendering/logic
   layer: number;
   point: number;
-  ownerAddress?: string; // Added for occupied spots
+  ownerAddress?: string; // Added for occupied spots & banks from structure data
   ownerName?: string;    // Added for occupied spots
+  original_structure_data?: GenericStructure; // New: To store full structure data for banks
 }
 
 
@@ -43,39 +44,97 @@ interface SelectedHexData extends Partial<HexSpot> { // Most fields from HexSpot
   // Add fields for new display requirements
   realmId?: number; 
   resourcesToDisplay?: ResourceDefinition[] | null; // Store resource objects for styling
+  guardTroopsInfo?: string[] | null; // New: array of strings for multi-line display or null
+  villagesCount?: number;   // New: For displaying village count
 }
 
 interface MapData {
   maxLayers: number;
   center: MapCenter;
-  banks: HexSpot[]; // Assuming banks also follow the HexSpot structure
+  banks: HexSpot[]; // Assuming banks also follow the HexSpot structure, will be augmented with owner
   allPotentialSpots: HexSpot[]; // Keep for coordinate lookup
   // zones: Zone[]; // REMOVED
 }
 
-// --- New Type for SettleRealmData ---
-interface SettleRealmInfo {
-  cities: number;
-  entity_id: number;
-  event_id: string;
-  harbors: number;
-  id: number;
-  owner_address: string; // Already exists in HexSpot but good to have here too
-  owner_name: string; // Hex encoded
-  realm_name: string; // Hex encoded
-  regions: number;
-  rivers: number;
-  timestamp: string; // Hex encoded timestamp
-  wonder: number; // 1 = not a wonder, other values = wonder
-  x: number; // Corresponds to originalContractX
-  y: number; // Corresponds to originalContractY
-  // Include other fields if needed, e.g., internal_*
+// --- New Structure Data Interfaces ---
+// StructureBaseData and StructureMetadata removed as GenericStructure is comprehensive enough for now
+/*
+interface StructureBaseData {
+  'base.category': number;
+  'base.coord_x': number;
+  'base.coord_y': number;
+  'base.created_at': number;
+  'base.level': number;
+  // Add other common 'base.*' fields if needed
 }
+
+interface StructureMetadata {
+  'metadata.has_wonder': number; // 0 = no, 1 = yes
+  'metadata.order': number;
+  'metadata.realm_id': number; // Important for realms
+  'metadata.village_realm': number; // Important for villages
+  'metadata.villages_count': number;
+}
+*/
+
+// Interface for Structure API return (generic structure)
+// Using bracket notation for keys with '.'
+interface GenericStructure {
+  'base.category': number;
+  'base.coord_x': number;
+  'base.coord_y': number;
+  'base.created_at': number;
+  'base.level': number;
+  'base.troop_explorer_count': number;
+  'base.troop_guard_count': number;
+  'base.troop_max_explorer_count': number;
+  'base.troop_max_guard_count': number;
+  category: number; // This seems redundant if base.category is primary
+  entity_id: number;
+  internal_created_at: string;
+  internal_entity_id: string;
+  internal_event_id: string;
+  internal_event_message_id: string | null;
+  internal_executed_at: string;
+  internal_id: string;
+  internal_updated_at: string;
+  'metadata.has_wonder': number;
+  'metadata.order': number;
+  'metadata.realm_id': number;
+  'metadata.village_realm': number;
+  'metadata.villages_count': number;
+  owner: string; // This is the owner_address
+  resources_packed: string;
+  // troop_explorers and troop_guards are complex, define if needed
+  [key: string]: unknown; // Changed from any to unknown for better type safety
+}
+
+
+// Specific data structure for Realms (Category 1), replacing SettleRealmInfo
+interface RealmStructureData {
+  entity_id: number;       // from top-level entity_id of the structure
+  owner_address: string;   // from 'owner' field of the structure
+  is_wonder: boolean;        // derived from 'metadata.has_wonder' (true if 1)
+  x: number;               // from 'base.coord_x'
+  y: number;               // from 'base.coord_y'
+  metadata_realm_id: number; // from 'metadata.realm_id', used for linking to /api/realms
+  // Original structure data can be included if needed for direct access later
+  original_structure_data: GenericStructure; // Store the whole thing for flexibility
+}
+
+// BankStructureData removed as it was empty and unused.
+// interface BankStructureData extends GenericStructure {}
+
+// Specific data structure for Villages (Category 5)
+// Changed to type alias to avoid empty interface error
+type VillageStructureData = GenericStructure;
+
+
 // --- End New Type ---
 
 // --- Updated Type for Realm Resource Data (from /api/realms, matching realms.ts output) ---
 interface RealmResourceInfo { // Aligning with the structure from loadRealms /api/realms
-  id: number; // Realm ID
+  id: number; // Realm ID (this will be metadata_realm_id from RealmStructureData)
   name: string; // Realm Name from MongoDB
   resources: ResourceDefinition[]; // Use imported ResourceDefinition type
   // Add other fields from /api/realms if needed later
@@ -126,6 +185,36 @@ function hslToHex(h: number, s: number, l: number): string {
   return rgbToHex(r, g, b);
 }
 
+// --- Updated Helper Function for Village Density Color (Green-Yellow-Red) ---
+const VILLAGE_DENSITY_SATURATION_GYR = 90; // High saturation for vivid colors
+const VILLAGE_DENSITY_LIGHTNESS_GYR = 55;  // A balanced lightness
+
+const GREEN_HUE = 120;
+const YELLOW_HUE = 60;
+const RED_HUE = 0;
+
+function getVillageDensityColor(count: number, maxCount: number): string {
+  if (count <= 0) return DEFAULT_FILL_COLOR;
+
+  const MAPPED_MAX_COUNT = Math.max(1, maxCount);
+  let ratio = count / MAPPED_MAX_COUNT;
+  ratio = Math.min(Math.max(ratio, 0.01), 1); // Clamp ratio, ensure a tiny village gets some color
+
+  let hue;
+  if (ratio <= 0.5) {
+    // Interpolate from Green to Yellow for the first half
+    const firstHalfRatio = ratio / 0.5; // Normalize ratio for 0-0.5 range to 0-1
+    hue = GREEN_HUE - (GREEN_HUE - YELLOW_HUE) * firstHalfRatio;
+  } else {
+    // Interpolate from Yellow to Red for the second half
+    const secondHalfRatio = (ratio - 0.5) / 0.5; // Normalize ratio for 0.5-1 range to 0-1
+    hue = YELLOW_HUE - (YELLOW_HUE - RED_HUE) * secondHalfRatio;
+  }
+  
+  return hslToHex(hue, VILLAGE_DENSITY_SATURATION_GYR, VILLAGE_DENSITY_LIGHTNESS_GYR);
+}
+// --- End Updated Helper Function ---
+
 // Function to generate a diverse color palette
 function generateMemberColors(count: number, baseSaturation: number, baseLightness: number): string[] {
   const colors: string[] = [];
@@ -166,28 +255,6 @@ const normalizeAddress = (address: string | undefined): string | undefined => {
   return '0x' + normalizedHex;
 };
 
-// --- New Hex to String Utility ---
-function hexToString(hex: string | undefined): string {
-  if (!hex || !hex.startsWith('0x') || hex === '0x0') {
-    return ''; // Return empty for undefined, non-hex, or zero hex
-  }
-  try {
-    const strippedHex = hex.substring(2);
-    let result = '';
-    for (let i = 0; i < strippedHex.length; i += 2) {
-      const byte = parseInt(strippedHex.substring(i, i + 2), 16);
-      if (byte > 0) { // Ignore null bytes
-        result += String.fromCharCode(byte);
-      }
-    }
-    return result;
-  } catch (e) {
-    console.error(`Failed to convert hex to string: ${hex}`, e);
-    return ''; // Return empty on error
-  }
-}
-// --- End New Utility ---
-
 // Define Member interface based on findings in other components
 interface Member {
   _id?: string;
@@ -209,13 +276,15 @@ const SettlingMapPage: React.FC = () => {
   const [viewBoxOffset, setViewBoxOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [initialViewBoxOffset, setInitialViewBoxOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   // Add state for SettleRealmData
-  const [settleRealmData, setSettleRealmData] = useState<SettleRealmInfo[]>([]);
-  const [loadingSettleRealmData, setLoadingSettleRealmData] = useState<boolean>(true);
+  const [realmStructuresData, setRealmStructuresData] = useState<RealmStructureData[]>([]); // Replaces settleRealmData
+  const [loadingStructuresData, setLoadingStructuresData] = useState<boolean>(true); // Replaces loadingSettleRealmData
+  // Add state for Village Data (from structures) - prefixed with _ as it's not yet read
+  const [_villageStructuresData, setVillageStructuresData] = useState<VillageStructureData[]>([]);
   // Add state for Realm Resource data
   const [realmResourceData, setRealmResourceData] = useState<RealmResourceInfo[]>([]);
   const [loadingRealmResources, setLoadingRealmResources] = useState<boolean>(true);
   // --- New State for Layers ---
-  const [selectedLayer, setSelectedLayer] = useState<'guild' | 'resource'>('guild');
+  const [selectedLayer, setSelectedLayer] = useState<'guild' | 'resource' | 'village'>('guild');
   const [selectedResourceHighlight, setSelectedResourceHighlight] = useState<string | null>('Dragonhide'); // Default to Dragonhide
   // ---------------------------
 
@@ -254,24 +323,24 @@ const SettlingMapPage: React.FC = () => {
   }, [guildMembers]); 
 
   // New: Map for SettleRealmData lookup
-  const settleRealmMap = useMemo(() => {
-    const map = new Map<string, SettleRealmInfo>();
-    settleRealmData.forEach(info => {
-      // Use the x and y from SettleRealmInfo as the key
+  const realmStructureMap = useMemo(() => {
+    const map = new Map<string, RealmStructureData>();
+    realmStructuresData.forEach(info => {
+      // Use the x and y from RealmStructureData as the key
       map.set(`${info.x}-${info.y}`, info);
     });
     return map;
-  }, [settleRealmData]);
+  }, [realmStructuresData]);
 
-  // New: Map for Realm Resource lookup (Realm Name -> Full RealmResourceInfo)
+  // New: Map for Realm Resource lookup (Realm ID (metadata_realm_id) -> Full RealmResourceInfo)
   const realmResourceMap = useMemo(() => {
     console.log("[SettlingMapPage] Creating realmResourceMap...");
-    const map = new Map<string, RealmResourceInfo>(); // Key is now string (realm name)
+    const map = new Map<number, RealmResourceInfo>(); // Key is now number (metadata_realm_id)
     realmResourceData.forEach(realm => {
-      if (realm.name) { // Ensure name exists before using it as key
-        map.set(realm.name, realm); // Use realm.name as key
+      if (realm.id) { // Ensure id exists before using it as key
+        map.set(realm.id, realm); // Use realm.id (which corresponds to metadata_realm_id) as key
       } else {
-        console.warn("[SettlingMapPage] Realm found with no name in realmResourceData:", realm);
+        console.warn("[SettlingMapPage] Realm found with no id in realmResourceData:", realm);
       }
     });
     return map;
@@ -290,18 +359,34 @@ const SettlingMapPage: React.FC = () => {
     return map;
   }, [mapData]);
 
+  // --- Max Village Count (for legend and color calculation) ---
+  const maxVillageCountForRealms = useMemo(() => {
+    if (realmStructuresData.length === 0) return 0;
+    let max = 0;
+    realmStructuresData.forEach(realmStructure => {
+      const villages = realmStructure.original_structure_data?.['metadata.villages_count'] || 0;
+      if (villages > max) {
+        max = villages;
+      }
+    });
+    return max > 0 ? max : 1; // Avoid division by zero, ensure at least 1 for ratio calculation if any villages exist
+  }, [realmStructuresData]);
+  // --- End Max Village Count ---
+
   // New: Combine SettleRealmData with PotentialSpots for rendering occupied spots
   const occupiedSpotsRenderData = useMemo(() => {
-    if (!mapData || settleRealmData.length === 0) return [];
+    if (!mapData || realmStructuresData.length === 0) return [];
+
+    // maxVillageCountForRealms is now used directly from the outer scope useMemo
 
     const renderData = [];
-    for (const settleInfo of settleRealmData) {
-      const spotContractIdentifier = `${settleInfo.x}-${settleInfo.y}`;
+    for (const realmStructure of realmStructuresData) {
+      const spotContractIdentifier = `${realmStructure.x}-${realmStructure.y}`;
       const potentialSpot = potentialSpotsMap.get(spotContractIdentifier);
 
       // Only include if it corresponds to a known potential spot
       if (potentialSpot) {
-        const normalizedOwnerAddress = normalizeAddress(settleInfo.owner_address);
+        const normalizedOwnerAddress = normalizeAddress(realmStructure.owner_address);
         let fillColor = DEFAULT_FILL_COLOR; // Start with default grey
 
         // Determine fill color based on the selected layer
@@ -314,13 +399,13 @@ const SettlingMapPage: React.FC = () => {
           }
         } else if (selectedLayer === 'resource' && selectedResourceHighlight) {
           // Resource layer: Check if the realm produces the highlighted resource
-          const realmInfo = realmResourceMap.get(hexToString(settleInfo.realm_name));
+          const realmInfoFromResourcesApi = realmResourceMap.get(realmStructure.metadata_realm_id);
           let producesResource = false;
-          if (realmInfo && realmInfo.resources) {
-            if (typeof realmInfo.resources[0] === 'string') {
-              producesResource = (realmInfo.resources as unknown as string[]).includes(selectedResourceHighlight);
-            } else if (typeof realmInfo.resources[0] === 'object') {
-              producesResource = (realmInfo.resources as ResourceDefinition[]).some(r => r.name === selectedResourceHighlight);
+          if (realmInfoFromResourcesApi && realmInfoFromResourcesApi.resources) {
+            if (typeof realmInfoFromResourcesApi.resources[0] === 'string') {
+              producesResource = (realmInfoFromResourcesApi.resources as unknown as string[]).includes(selectedResourceHighlight);
+            } else if (typeof realmInfoFromResourcesApi.resources[0] === 'object') {
+              producesResource = (realmInfoFromResourcesApi.resources as ResourceDefinition[]).some(r => r.name === selectedResourceHighlight);
             }
           }
 
@@ -329,55 +414,51 @@ const SettlingMapPage: React.FC = () => {
           } else {
             fillColor = DEFAULT_FILL_COLOR; // Default grey if not producing resource
           }
+        } else if (selectedLayer === 'village') {
+          // Village layer: Color by village density
+          const villagesCount = realmStructure.original_structure_data?.['metadata.villages_count'] || 0;
+          if (villagesCount >= 1) {
+            fillColor = getVillageDensityColor(villagesCount, maxVillageCountForRealms);
+          } else {
+            fillColor = DEFAULT_FILL_COLOR; // Default for realms with no villages in this mode
+          }
         } else {
-          // Default case (e.g., resource layer selected but no resource chosen)
+          // Default case (should not happen with defined layers but good fallback)
           fillColor = DEFAULT_FILL_COLOR;
         }
 
-        const isWonder = settleInfo.wonder !== 1;
-
         renderData.push({
-          key: `occupied-${potentialSpot.layer}-${potentialSpot.point}-${settleInfo.x}-${settleInfo.y}`,
+          key: `occupied-${potentialSpot.layer}-${potentialSpot.point}-${realmStructure.x}-${realmStructure.y}`,
           normalizedX: potentialSpot.normalizedX,
           normalizedY: potentialSpot.normalizedY,
           fillColor: fillColor,
-          isWonder: isWonder,
-          // Include settleInfo and potentialSpot data for the click handler
-          originalData: { ...potentialSpot, ...settleInfo } 
+          isWonder: realmStructure.is_wonder, // Directly use the boolean
+          // Include realmStructure and potentialSpot data for the click handler
+          originalData: { ...potentialSpot, ...realmStructure } 
         });
       }
     }
     return renderData;
-  }, [mapData, settleRealmData, potentialSpotsMap, memberToColorMap, selectedLayer, selectedResourceHighlight, realmResourceMap]); // Dependencies
+  }, [mapData, realmStructuresData, potentialSpotsMap, memberToColorMap, selectedLayer, selectedResourceHighlight, realmResourceMap, maxVillageCountForRealms]); // Added maxVillageCountForRealms
 
-  // MODIFIED: Member Legend now uses settleRealmData
+  // MODIFIED: Member Legend now uses realmStructuresData
   const coloredMembersForLegend = useMemo(() => {
-    if (settleRealmData.length === 0 || guildMembers.length === 0) return [];
+    if (realmStructuresData.length === 0 || guildMembers.length === 0) return [];
     const uniqueMembers = new Map<string, { name?: string; color: string; address: string }>();
 
-    settleRealmData.forEach(settleInfo => { // Iterate over settleRealmData
-      if (settleInfo.owner_address) {
-        const normalizedAddr = normalizeAddress(settleInfo.owner_address)!;
-        const ownerNameFromHex = hexToString(settleInfo.owner_name); // Convert hex name
-
-        // Log check for specific name/address if needed (example below)
-        // if (ownerNameFromHex && ownerNameFromHex.toLowerCase().includes('adventurer')) {
-        //   console.log("[SettlingMapPage] Legend Check for 'adventurer':", {
-        //     rawAddress: settleInfo.owner_address,
-        //     normalizedAddress: normalizedAddr,
-        //     ownerName: ownerNameFromHex,
-        //     isInMemberToColorMap: memberToColorMap.has(normalizedAddr),
-        //     colorFromMap: memberToColorMap.get(normalizedAddr)
-        //   });
-        // }
+    realmStructuresData.forEach(realmStructure => { // Iterate over realmStructuresData
+      if (realmStructure.owner_address) {
+        const normalizedAddr = normalizeAddress(realmStructure.owner_address)!;
+        // Owner name is not directly available in RealmStructureData, rely on guildMembers
+        // const ownerNameFromHex = ''; // hexToString(realmStructure.owner_name); // This field is gone
 
         if (memberToColorMap.has(normalizedAddr)) { 
           if (!uniqueMembers.has(normalizedAddr)) {
             const memberUsername = memberAddressToUsernameMap.get(normalizedAddr);
             uniqueMembers.set(normalizedAddr, {
               address: normalizedAddr,
-              // Prioritize API username, fallback to converted hex name
-              name: memberUsername || ownerNameFromHex || undefined, 
+              // Prioritize API username
+              name: memberUsername || undefined, 
               color: memberToColorMap.get(normalizedAddr)!
             });
           }
@@ -385,32 +466,34 @@ const SettlingMapPage: React.FC = () => {
       }
     });
     return Array.from(uniqueMembers.values()).sort((a,b) => (a.name || a.address).localeCompare(b.name || b.address));
-  }, [settleRealmData, guildMembers, memberToColorMap, memberAddressToUsernameMap]); // Updated dependencies
+  }, [realmStructuresData, guildMembers, memberToColorMap, memberAddressToUsernameMap]); // Updated dependencies
 
   // New function to encapsulate data fetching
   const fetchMapData = async () => {
     console.log("[SettlingMapPage] Fetching map data..."); // Log start of fetch
     setLoading(true);
     setLoadingMembers(true);
-    setLoadingSettleRealmData(true); 
+    setLoadingStructuresData(true); 
     setLoadingRealmResources(true); 
     setError(null); // Clear previous errors on new fetch
 
     try {
       // Fetch map data, member data, SettleRealmData, and RealmResources in parallel
-      const [mapResponse, memberResponse, settleRealmResponse, realmResourceResponse] = await Promise.all([
+      const [mapResponse, memberResponse, structuresResponse, realmResourceResponse] = await Promise.all([
         fetch('/eternum_all_locations.json'),
         fetch('/api/members'),
-        fetch(`${process.env.NEXT_PUBLIC_GAME_DATA_SQL}?query=select+*+%0Afrom+%22s1_eternum-SettleRealmData%22`),
+        fetch(`${process.env.NEXT_PUBLIC_GAME_DATA_SQL}?query=select+*+%0Afrom+%22s1_eternum-Structure%22`), // Updated URL
         fetch("/api/realms") // Fetch realm resource data
       ]);
 
-      // Process Map Data
+      // Process Map Data (comes first as structures might augment it)
       if (!mapResponse.ok) {
         throw new Error(`Failed to fetch map data: ${mapResponse.status} ${mapResponse.statusText}`);
       }
       const mapJsonData: MapData = await mapResponse.json();
-      setMapData(mapJsonData);
+      // Temporarily store mapJsonData, banks will be updated after structures are processed
+      let currentMapData = mapJsonData;
+
 
       // Process Member Data
       if (!memberResponse.ok) {
@@ -421,15 +504,58 @@ const SettlingMapPage: React.FC = () => {
         setGuildMembers(membersJsonData); 
       }
 
-      // Process SettleRealmData
-      if (!settleRealmResponse.ok) {
-        console.error('Failed to fetch SettleRealmData:', settleRealmResponse.statusText);
-        setSettleRealmData([]); // Set empty on error
+      // Process Structures Data (replaces SettleRealmData)
+      if (!structuresResponse.ok) {
+        console.error('Failed to fetch Structures Data:', structuresResponse.statusText);
+        setRealmStructuresData([]); 
+        setVillageStructuresData([]);
       } else {
-        const settleRealmJsonData: SettleRealmInfo[] = await settleRealmResponse.json();
-        setSettleRealmData(settleRealmJsonData);
-        console.log(`[SettlingMapPage] Fetched ${settleRealmJsonData.length} SettleRealmData entries.`);
+        const structuresJson: GenericStructure[] = await structuresResponse.json();
+        console.log(`[SettlingMapPage] Fetched ${structuresJson.length} structures.`);
+
+        const loadedRealms: RealmStructureData[] = [];
+        const loadedVillages: VillageStructureData[] = [];
+        const bankStructureMapByCoords = new Map<string, GenericStructure>();
+
+        structuresJson.forEach(struct => {
+          if (struct['base.category'] === 1) { // Realm
+            loadedRealms.push({
+              entity_id: struct.entity_id,
+              owner_address: struct.owner,
+              is_wonder: struct['metadata.has_wonder'] === 1,
+              x: struct['base.coord_x'],
+              y: struct['base.coord_y'],
+              metadata_realm_id: struct['metadata.realm_id'],
+              original_structure_data: struct, // Store full structure
+            });
+          } else if (struct['base.category'] === 3) { // Bank
+            bankStructureMapByCoords.set(`${struct['base.coord_x']}-${struct['base.coord_y']}`, struct);
+          } else if (struct['base.category'] === 5) { // Village
+            loadedVillages.push(struct as VillageStructureData); // Assuming direct cast is okay for now
+          }
+        });
+        setRealmStructuresData(loadedRealms);
+        setVillageStructuresData(loadedVillages);
+        console.log(`[SettlingMapPage] Processed ${loadedRealms.length} realms, ${loadedVillages.length} villages, and ${bankStructureMapByCoords.size} bank structures.`);
+
+        // Update bank owners and attach full structure data in currentMapData
+        const updatedBanks = currentMapData.banks.map(bankSpot => {
+          const foundBankStructure = bankStructureMapByCoords.get(`${bankSpot.originalContractX}-${bankSpot.originalContractY}`);
+          if (foundBankStructure) {
+            return { 
+              ...bankSpot, 
+              ownerAddress: foundBankStructure.owner, 
+              original_structure_data: foundBankStructure 
+            };
+          }
+          return bankSpot;
+        });
+        currentMapData = { ...currentMapData, banks: updatedBanks };
       }
+      
+      // Now set the map data (potentially with updated banks)
+      setMapData(currentMapData);
+
 
       // Process Realm Resource Data
       if (!realmResourceResponse.ok) {
@@ -453,7 +579,7 @@ const SettlingMapPage: React.FC = () => {
     } finally {
       setLoading(false);
       setLoadingMembers(false);
-      setLoadingSettleRealmData(false); 
+      setLoadingStructuresData(false); 
       setLoadingRealmResources(false); 
       console.log("[SettlingMapPage] Finished fetching map data."); // Log end of fetch
     }
@@ -614,26 +740,26 @@ const SettlingMapPage: React.FC = () => {
   };
 
   // MODIFIED handleHexClick to work with new data structure from occupiedSpotsRenderData
-  const handleHexClick = (hexData: HexSpot | SettleRealmInfo | MapCenter, type: string) => {
+  const handleHexClick = (hexData: HexSpot | RealmStructureData | MapCenter, type: string) => {
     if (isDragging) return;
 
-    let currentSettleInfo: SettleRealmInfo | undefined = undefined;
+    let currentRealmStructure: RealmStructureData | undefined = undefined;
     let currentPotentialSpotInfo: Partial<HexSpot> = {};
     let normalizedX: number, normalizedY: number;
     let contractX: number | undefined, contractY: number | undefined;
     let ownerAddressFromData: string | undefined;
 
     if (type === 'Occupied Spot') {
-      // For Occupied Spot, hexData is a merged object of potentialSpot & settleInfo
-      // from renderSpot.originalData. SettleRealmInfo fields (x, y, owner_address etc.) are directly available.
-      currentSettleInfo = hexData as SettleRealmInfo; // It contains all SettleRealmInfo fields
+      // For Occupied Spot, hexData is a merged object of potentialSpot & realmStructure
+      // from renderSpot.originalData. RealmStructureData fields are directly available.
+      currentRealmStructure = hexData as RealmStructureData; 
       currentPotentialSpotInfo = hexData as HexSpot; // It also contains HexSpot fields like normalizedX/Y
       
       normalizedX = currentPotentialSpotInfo.normalizedX!;
       normalizedY = currentPotentialSpotInfo.normalizedY!;
-      contractX = currentSettleInfo.x; // from SettleRealmInfo
-      contractY = currentSettleInfo.y; // from SettleRealmInfo
-      ownerAddressFromData = currentSettleInfo.owner_address;
+      contractX = currentRealmStructure.x; 
+      contractY = currentRealmStructure.y; 
+      ownerAddressFromData = currentRealmStructure.owner_address;
 
     } else if ('normalizedX' in hexData && 'normalizedY' in hexData) { // Potential Spot or Bank
       currentPotentialSpotInfo = hexData as HexSpot;
@@ -641,10 +767,10 @@ const SettlingMapPage: React.FC = () => {
       normalizedY = currentPotentialSpotInfo.normalizedY ?? 0; // Provide fallback
       contractX = currentPotentialSpotInfo.originalContractX;
       contractY = currentPotentialSpotInfo.originalContractY;
-      ownerAddressFromData = currentPotentialSpotInfo.ownerAddress; // Banks/etc might have this if ever assigned
-      // For non-occupied, try to find settleInfo if it exists (e.g., a wonder that is not occupied by a guild member)
+      ownerAddressFromData = currentPotentialSpotInfo.ownerAddress; // Banks now have this from structure data
+      // For non-occupied, try to find realm structure if it exists (e.g., a wonder that is not occupied by a guild member)
       if (contractX !== undefined && contractY !== undefined) {
-        currentSettleInfo = settleRealmMap.get(`${contractX}-${contractY}`);
+        currentRealmStructure = realmStructureMap.get(`${contractX}-${contractY}`);
       }
     } else { // Center Tile
       const centerData = hexData as MapCenter;
@@ -657,31 +783,25 @@ const SettlingMapPage: React.FC = () => {
 
     const normalizedOwnerAddress = normalizeAddress(ownerAddressFromData);
 
-    const settleInfoToUse = currentSettleInfo; 
+    const realmStructureToUse = currentRealmStructure; 
 
     let displayOwnerName = '';
-    if (settleInfoToUse && settleInfoToUse.owner_name) {
-      const convertedName = hexToString(settleInfoToUse.owner_name);
-      if (convertedName) displayOwnerName = convertedName;
-    } 
-    if (!displayOwnerName && normalizedOwnerAddress) {
+    // Owner name from hex is gone from realmStructure. Rely on memberAddressToUsernameMap
+    if (normalizedOwnerAddress) {
         displayOwnerName = memberAddressToUsernameMap.get(normalizedOwnerAddress) || '';
     }
-    if (!displayOwnerName && currentPotentialSpotInfo.ownerName) { // Fallback to potential spot's original ownerName (e.g. from banks)
+    if (!displayOwnerName && currentPotentialSpotInfo.ownerName) { // Fallback to potential spot's original ownerName (e.g. from banks if it was ever set there)
          displayOwnerName = currentPotentialSpotInfo.ownerName;
     }
 
-    // --- UPDATED: Look up realm by NAME --- 
-    const realmNameFromSettle = settleInfoToUse ? hexToString(settleInfoToUse.realm_name) : undefined;
+    // --- UPDATED: Look up realm by metadata_realm_id --- 
+    const realmInfoFromMongo = realmStructureToUse ? realmResourceMap.get(realmStructureToUse.metadata_realm_id) : undefined;
 
-    const realmInfoFromMongo = realmNameFromSettle ? realmResourceMap.get(realmNameFromSettle) : undefined;
-
-    // The displayRealmName logic can now prioritize the name used for the successful lookup,
-    // or fallback to the settle name if the mongo lookup failed but we still have the settle name.
-    const displayRealmName = realmInfoFromMongo ? realmInfoFromMongo.name : realmNameFromSettle;
+    // The displayRealmName logic can now prioritize the name used for the successful lookup.
+    const displayRealmName = realmInfoFromMongo ? realmInfoFromMongo.name : (realmStructureToUse ? `Realm ID: ${realmStructureToUse.metadata_realm_id}` : undefined);
     
-    // Extract realmId for display purposes, even though it's not the lookup key anymore
-    const realmId = settleInfoToUse?.entity_id; 
+    // Use metadata_realm_id for display, as it's the key for /api/realms
+    const displayableRealmId = realmStructureToUse?.metadata_realm_id; 
     // --- END NAME LOOKUP --- 
 
     // --- Keep the resource extraction logic as it was based on the matched realmInfoFromMongo ---
@@ -716,9 +836,28 @@ const SettlingMapPage: React.FC = () => {
       }
     } else if (realmInfoFromMongo) {
       console.warn("[SettlingMapPage][handleHexClick] realmInfoFromMongo exists, but realmInfoFromMongo.resources is missing or undefined:", JSON.stringify(realmInfoFromMongo, null, 2));
-    } else {
-      console.log("[SettlingMapPage][handleHexClick] realmInfoFromMongo is undefined, cannot extract resources.");
+    } else if (realmStructureToUse) { // Only log if we expected to find something (i.e., it's a realm structure)
+      console.log(`[SettlingMapPage][handleHexClick] realmInfoFromMongo is undefined for metadata_realm_id ${realmStructureToUse.metadata_realm_id}, cannot extract resources.`);
     }
+
+    // --- New: Extract Guard Troops and Village Count for Occupied Spots ---
+    let guardTroopsDisplay: string[] | null = null;
+    let villagesDisplayCount: number | undefined = undefined;
+    let structureToParseForTroops: GenericStructure | undefined = undefined;
+
+    if (type === 'Occupied Spot' && realmStructureToUse && realmStructureToUse.original_structure_data) {
+      const structData = realmStructureToUse.original_structure_data;
+      villagesDisplayCount = structData['metadata.villages_count'];
+      structureToParseForTroops = structData; // For realms
+    } else if (type === 'Bank') {
+      // Assuming hexData for a bank now contains original_structure_data from fetchMapData augmentation
+      const bankHexSpot = hexData as HexSpot; // HexSpot already allows original_structure_data?: GenericStructure
+      structureToParseForTroops = bankHexSpot.original_structure_data; // For banks
+    }
+
+    guardTroopsDisplay = parseTroopGuardsFromStructure(structureToParseForTroops);
+
+    // --- End New Extraction ---
 
     const dataForState: SelectedHexData = {
       type: type,
@@ -730,17 +869,62 @@ const SettlingMapPage: React.FC = () => {
       ...( currentPotentialSpotInfo.layer !== undefined && { layer: currentPotentialSpotInfo.layer }),
       ...( currentPotentialSpotInfo.point !== undefined && { point: currentPotentialSpotInfo.point }),
       ownerAddress: normalizedOwnerAddress, 
-      ownerName: displayOwnerName || '-',
-      isWonder: settleInfoToUse ? settleInfoToUse.wonder !== 1 : false, 
+      ownerName: displayOwnerName || (normalizedOwnerAddress ? `${normalizedOwnerAddress.substring(0,6)}...` : '-'), // Fallback for owner name
+      isWonder: realmStructureToUse ? realmStructureToUse.is_wonder : false, 
       // Restore realmId and displayRealmName assignment
-      realmId: realmId, 
+      realmId: displayableRealmId, // Use metadata_realm_id for display
       realmName: displayRealmName || undefined,
-      resourcesToDisplay: finalResourcesToDisplay // Store the array of objects
+      resourcesToDisplay: finalResourcesToDisplay, // Store the array of objects
+      guardTroopsInfo: guardTroopsDisplay,
+      villagesCount: villagesDisplayCount,
     };
     setSelectedHex(dataForState);
   };
 
-  if (loading || loadingMembers || loadingSettleRealmData || loadingRealmResources) { // Update loading check
+  // --- New Helper Function to Parse Troop Guards from Structure Data ---
+  function parseTroopGuardsFromStructure(structureData: GenericStructure | undefined): string[] | null {
+    if (!structureData) return null;
+
+    const troopCounts: { [key: string]: number } = {}; 
+    let totalTroopCount = 0;
+
+    for (const key in structureData) {
+      if (key.startsWith('troop_guards.') && key.endsWith('.count')) {
+        const parts = key.split('.'); 
+        if (parts.length === 3) {
+          const troopSlot = parts[1]; // 'alpha', 'bravo', etc.
+          const category = structureData[`troop_guards.${troopSlot}.category`];
+          const tier = structureData[`troop_guards.${troopSlot}.tier`];
+          const countHex = structureData[key];
+          
+          if (category && tier && typeof countHex === 'string' && countHex.startsWith('0x')) {
+            try {
+              const count = parseInt(countHex, 16);
+              if (!isNaN(count) && count > 0) {
+                const troopKey = `${category}${tier}`;
+                const adjustedCount = count / 1000000000; 
+                if (adjustedCount > 0) { 
+                  troopCounts[troopKey] = (troopCounts[troopKey] || 0) + adjustedCount;
+                  totalTroopCount += adjustedCount;
+                }
+              }
+            } catch (e) {
+              console.warn(`Failed to parse troop count for ${key}: ${countHex}`, e);
+            }
+          }
+        }
+      }
+    }
+
+    if (totalTroopCount > 0) {
+      return Object.entries(troopCounts)
+                     .map(([type, num]) => `${num.toLocaleString()} ${type}`); // Returns array of strings
+    }
+    return null; // Return null if no troops
+  }
+  // --- End Troop Guard Parsing Function ---
+
+  if (loading || loadingMembers || loadingStructuresData || loadingRealmResources) { // Update loading check
     return <div className="map-loading">Loading Map Data...</div>;
   }
 
@@ -772,39 +956,95 @@ const SettlingMapPage: React.FC = () => {
               {selectedHex.type === 'Occupied Spot' ? (
                 <>
                   <h3>{selectedHex.realmId || 'N/A'} : {selectedHex.realmName || 'Unnamed Realm'}</h3>
-                  <p>Owner: {selectedHex.ownerName}</p>
-                  {selectedHex.isWonder && <p className="wonder-indicator">Status: Wonder!</p>}
-                  <p>Coords: ({selectedHex.normalizedX}, {selectedHex.normalizedY})</p>
-                  <div className="info-panel-resources">
-                    <span>Resources: </span> 
-                    {selectedHex.resourcesToDisplay && selectedHex.resourcesToDisplay.length > 0 ? (
-                      selectedHex.resourcesToDisplay.map(res => (
-                        <span 
-                          key={res.id} 
-                          className="resource-pair" 
-                          data-rarity={res.rarity}
-                        >
-                          {res.name}
-                        </span>
-                      ))
-                    ) : (
-                      <span>N/A</span>
-                    )}
+                  <div className="info-line">
+                    <span className="info-label">Owner:</span>
+                    <span className="info-value">{selectedHex.ownerName}</span>
+                  </div>
+                  {selectedHex.villagesCount !== undefined && (
+                    <div className="info-line">
+                      <span className="info-label">Villages:</span>
+                      <span className="info-value">{selectedHex.villagesCount.toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="info-line">
+                    <span className="info-label">Coords:</span>
+                    <span className="info-value">({selectedHex.normalizedX}, {selectedHex.normalizedY})</span>
+                  </div>
+                  {selectedHex.isWonder && (
+                    <div className="info-line">
+                      <span className="info-label">Status:</span>
+                      <span className="info-value wonder-indicator">Wonder!</span>
+                    </div>
+                  )}
+                  {/* New: Display Guard Troops and Village Count */}
+                  {selectedHex.guardTroopsInfo && selectedHex.guardTroopsInfo.length > 0 && (
+                     <div className="info-line guard-troops-line">
+                       <span className="info-label">Guard Troops:</span>
+                       <div className="info-value guard-troops-container">
+                        {selectedHex.guardTroopsInfo.map((troopEntry, index) => (
+                          <div key={`troop-${index}`} className="troop-entry">{troopEntry}</div>
+                        ))}
+                       </div>
+                    </div>
+                  )}
+                  <div className="info-line resources-line">
+                    <span className="info-label">Resources:</span> 
+                    <div className="info-value resources-container">
+                      {selectedHex.resourcesToDisplay && selectedHex.resourcesToDisplay.length > 0 ? (
+                        selectedHex.resourcesToDisplay.map(res => (
+                          <span 
+                            key={res.id} 
+                            className="resource-pair" 
+                            data-rarity={res.rarity}
+                          >
+                            {res.name}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="info-value-na">N/A</span>
+                      )}
+                    </div>
                   </div>
                 </>
               ) : selectedHex.type === 'Bank' || selectedHex.type === 'Center' || selectedHex.type === 'Potential Spot' ? (
                 <> 
                   {/* Default display for Bank, Center, Potential Spot */}
                   <h3>{selectedHex.type}</h3>
-                  {selectedHex.side !== undefined && <p>Side, Layer, Point : ({selectedHex.side}, {selectedHex.layer}, {selectedHex.point})</p>}
-                  {selectedHex.normalizedX !== undefined && <p>Normalized X, Y : ({selectedHex.normalizedX}, {selectedHex.normalizedY})</p>}
+                  {selectedHex.side !== undefined && 
+                    <div className="info-line">
+                        <span className="info-label">Side, Layer, Point:</span>
+                        <span className="info-value">({selectedHex.side}, {selectedHex.layer}, {selectedHex.point})</span>
+                    </div>
+                  }
+                  {selectedHex.normalizedX !== undefined && 
+                    <div className="info-line">
+                        <span className="info-label">Normalized X, Y:</span>
+                        <span className="info-value">({selectedHex.normalizedX}, {selectedHex.normalizedY})</span>
+                    </div>
+                  }
+                  {/* Display Guard Troops for Banks if available */}
+                  {selectedHex.type === 'Bank' && selectedHex.guardTroopsInfo && selectedHex.guardTroopsInfo.length > 0 && (
+                    <div className="info-line guard-troops-line">
+                       <span className="info-label">Guard Troops:</span>
+                       <div className="info-value guard-troops-container">
+                        {selectedHex.guardTroopsInfo.map((troopEntry, index) => (
+                          <div key={`bank-troop-${index}`} className="troop-entry">{troopEntry}</div>
+                        ))}
+                       </div>
+                    </div>
+                  )}
                 </>
               ) : (
                  // Default/fallback case if needed, or render nothing
                  <p>Details not available for this spot.</p>
               )}
               {/* Always show owner address if available for any type EXCEPT Occupied Spot */}
-              {selectedHex.type !== 'Occupied Spot' && selectedHex.ownerAddress && <p>Owner Address: {selectedHex.ownerAddress}</p>}
+              {selectedHex.type !== 'Occupied Spot' && selectedHex.ownerAddress && 
+                <div className="info-line">
+                    <span className="info-label">Owner Address:</span>
+                    <span className="info-value address-value">{selectedHex.ownerAddress}</span>
+                </div>
+              }
             </div>
           )}
           {!selectedHex && (
@@ -850,7 +1090,7 @@ const SettlingMapPage: React.FC = () => {
                   // Exclude banks and center tile if they happen to overlap (unlikely but safe)
                   const spotContractIdentifier = `${renderSpot.originalData.x}-${renderSpot.originalData.y}`;
                   if (bankSpotsSet.has(spotContractIdentifier)) return null; 
-                  if (mapData.center && renderSpot.normalizedX === mapData.center.x && renderSpot.normalizedY === mapData.center.y && renderSpot.originalData.layer === 0 && renderSpot.originalData.point === 0) return null;
+                  if (mapData.center && renderSpot.normalizedX === mapData.center.x && renderSpot.normalizedY === mapData.center.y && renderSpot.originalData.layer === 0 && renderSpot.originalData.point === 0) return null; // TODO: Check this layer/point logic for center with new data
 
                   const isSelected = selectedHex && renderSpot.normalizedX === selectedHex.normalizedX && renderSpot.normalizedY === selectedHex.normalizedY;
                   const wonderClass = renderSpot.isWonder ? 'wonder-pulse' : '';
@@ -948,6 +1188,15 @@ const SettlingMapPage: React.FC = () => {
                   onChange={() => setSelectedLayer('resource')}
                 /> Resource Search
               </label>
+              <label>
+                <input 
+                  type="radio" 
+                  name="layer" 
+                  value="village" 
+                  checked={selectedLayer === 'village'}
+                  onChange={() => setSelectedLayer('village')}
+                /> Village Density
+              </label>
             </div>
           </div>
 
@@ -989,6 +1238,39 @@ const SettlingMapPage: React.FC = () => {
                   {member.name || `${member.address.substring(0, 6)}...${member.address.substring(member.address.length - 4)}`}
                 </li>
               ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Village Density Legend (Conditionally Rendered) */}
+        {selectedLayer === 'village' && (
+          <div className="legend-section village-density-legend">
+            <h5 className="legend-title">Village Density (Count)</h5>
+            <ul>
+              {[1, 2, 3, 4, 5, 6].map(count => (
+                <li key={`village-legend-${count}`}>
+                  <span 
+                    className="legend-color-swatch"
+                    style={{ 
+                      backgroundColor: getVillageDensityColor(count, maxVillageCountForRealms), 
+                      border: getVillageDensityColor(count, maxVillageCountForRealms) === DEFAULT_FILL_COLOR ? '1px solid #555' : 'none' // Add border if it's default color
+                    }}
+                  ></span>
+                  {count}
+                </li>
+              ))}
+              {maxVillageCountForRealms > 6 && (
+                 <li key="village-legend-more">
+                  <span 
+                    className="legend-color-swatch"
+                    style={{ 
+                        backgroundColor: getVillageDensityColor(maxVillageCountForRealms, maxVillageCountForRealms),
+                        border: getVillageDensityColor(maxVillageCountForRealms, maxVillageCountForRealms) === DEFAULT_FILL_COLOR ? '1px solid #555' : 'none'
+                    }}
+                  ></span>
+                  {`${maxVillageCountForRealms} (Max)`}
+                </li>
+              )}
             </ul>
           </div>
         )}
