@@ -1,71 +1,65 @@
 import type { Realm } from '../types/resources';
 import { ResourceDefinition, getResourceDefinitionFromName, RESOURCE_BANDS } from '../types/resources';
 
-interface RawRealm {
+// Interface for the raw object structure expected from /api/realms when it returns an array
+// This should match the RealmResponse interface in /api/realms/route.ts
+interface ApiRealmObject {
+  id: number;
   name: string;
-  description: string;
-  image: string;
-  resources: string[];
   owner?: string;
+  resources: string[]; 
 }
 
 export const loadRealms = async (): Promise<Realm[]> => {
   console.log("Starting loadRealms...");
   try {
-    // 1. Fetch base realm data
-    console.log("Fetching base realm data...");
+    console.log("Fetching realm data from /api/realms...");
     const realmsResponse = await fetch('/api/realms');
     if (!realmsResponse.ok) {
       throw new Error(`Failed to fetch realms: ${realmsResponse.statusText}`);
     }
-    const realmsData = await realmsResponse.json();
-    if (typeof realmsData !== 'object' || realmsData === null) {
-        console.error('Invalid realms data received from API:', realmsData);
-        return [];
+    
+    // Expect an array of ApiRealmObject from the API
+    const realmsDataArray: ApiRealmObject[] = await realmsResponse.json();
+
+    if (!Array.isArray(realmsDataArray)) {
+      console.error('Invalid realms data received from API (expected an array):', realmsDataArray);
+      return [];
     }
-    console.log("Base realm data fetched.");
+    console.log(`Successfully fetched ${realmsDataArray.length} realm objects.`);
 
-    const realmEntries = Object.entries(realmsData);
-
-    // Map MongoDB data and merge owner from ownerMap - UPDATED
-    const finalRealms = realmEntries.map(([idString, realm]) => {
-      const rawRealm = realm as RawRealm; // Assuming RawRealm might contain 'owner'
-      const realmId = parseInt(idString, 10);
-      // This correctly creates the array of resource name strings
-      const resourceNames = rawRealm.resources
-      // Map resource names (string[]) to ResourceDefinition[]
-      const resourceDefinitions: ResourceDefinition[] = resourceNames
-        .map(name => getResourceDefinitionFromName(name)) // Look up the definition by name
-        // Filter out any names that didn't match a definition
+    const finalRealms = realmsDataArray.map((apiRealm) => {
+      // Map resource names (string[]) from API to ResourceDefinition[]
+      const resourceDefinitions: ResourceDefinition[] = (apiRealm.resources || []) // Ensure apiRealm.resources is treated as an array
+        .map(name => getResourceDefinitionFromName(name))
         .filter((def): def is ResourceDefinition => def !== undefined);
       
-      // Calculate available troops
       const realmResourceNames = new Set(resourceDefinitions.map(def => def.name));
       const availableTroops: string[] = [];
       for (const [troopBand, requiredResourceNames] of Object.entries(RESOURCE_BANDS)) {
-        // Filter out undefined names that might result from getDef
         const validRequiredNames = requiredResourceNames.filter((name): name is string => name !== undefined);
-        if (validRequiredNames.length === requiredResourceNames.length && // Ensure all names were valid initially
+        if (validRequiredNames.length === requiredResourceNames.length &&
             validRequiredNames.every(name => realmResourceNames.has(name))) {
           availableTroops.push(troopBand);
         }
       }
 
+      // Construct the Realm object for the Dashboard
       return {
-        id: realmId, 
-        name: rawRealm.name || `Realm ${realmId}`, 
-        description: rawRealm.description || '',
-        image: rawRealm.image || '',
+        id: apiRealm.id, // Use the id directly from the API response object
+        name: apiRealm.name || `Realm ${apiRealm.id}`,
+        description: '', // Provide default if not in ApiRealmObject (Realm type might expect it)
+        image: '',       // Provide default if not in ApiRealmObject
         resources: resourceDefinitions,
-        availableTroops: availableTroops, // Add calculated troops
-        owner: rawRealm.owner, // Directly use owner from MongoDB data
+        availableTroops: availableTroops,
+        owner: apiRealm.owner, // Use owner directly from the API response object
       };
     });
-    console.log("Data merging complete. loadRealms finished.");
+    console.log(`Processed ${finalRealms.length} realms. loadRealms finished.`);
     return finalRealms;
 
   } catch (error) {
     console.error('Error in loadRealms:', error);
-    return []; // Return empty array on error
+    return []; 
   }
 }; 

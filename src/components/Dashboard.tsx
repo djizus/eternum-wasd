@@ -12,15 +12,6 @@ import './Dashboard.css';
 // List of resource IDs/names to exclude from the filter dropdown
 const EXCLUDED_RESOURCES_NAMES = ['Labor', 'Ancient Fragment', 'Donkey', 'Lords', 'Wheat', 'Fish'];
 
-// Troop tier mapping - this would need actual troop names if re-integrated
-/* // Removed unused variable
-const troopTierMap: Record<string, 'T1' | 'T2' | 'T3'> = {
-  Knight: 'T1', Crossbowman: 'T1', Paladin: 'T1',
-  KnightT2: 'T2', CrossbowmanT2: 'T2', PaladinT2: 'T2',
-  KnightT3: 'T3', CrossbowmanT3: 'T3', PaladinT3: 'T3',
-};
-*/
-
 interface Member {
   _id?: string; 
   address?: string;
@@ -29,11 +20,26 @@ interface Member {
   realmCount?: number; 
 }
 
+// --- Helper: Normalize address --- 
+// Updated to be consistent with LiveMapPage.tsx and /api/cartridge-usernames/route.ts
+const normalizeDashboardAddress = (address: string | undefined): string | undefined => {
+  if (!address) return undefined; // MODIFIED BODY
+  const lowerAddress = address.toLowerCase();
+  const stripped = lowerAddress.startsWith('0x') ? lowerAddress.slice(2) : lowerAddress;
+  const normalizedHex = stripped.replace(/^0+/, '');
+  if (normalizedHex === '') return '0x0';
+  return '0x' + normalizedHex;
+};
+
 const Dashboard = () => {
   const [realms, setRealms] = useState<Realm[]>([]);
   const [guildMembersDetails, setGuildMembersDetails] = useState<Member[]>([]); 
   const [loading, setLoading] = useState(true);
-  const [loadingMembers, setLoadingMembers] = useState(true); 
+  const [loadingMembers, setLoadingMembers] = useState(true);
+  // --- New State for Cartridge Usernames ---
+  const [cartridgeUsernames, setCartridgeUsernames] = useState<Map<string, string>>(new Map());
+  const [loadingCartridgeUsernames, setLoadingCartridgeUsernames] = useState<boolean>(true);
+  // --- End New State ---
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedResource, setSelectedResource] = useState<string | null>(null); // Filter by resource name (string)
   const [selectedTroop, setSelectedTroop] = useState<string | null>(null); // State for troop filter
@@ -76,6 +82,7 @@ const Dashboard = () => {
     const fetchInitialData = async () => {
       setLoading(true);
       setLoadingMembers(true);
+      setLoadingCartridgeUsernames(true); // Initialize loading for Cartridge usernames
       try {
         const [loadedRealmsData, memberResponse] = await Promise.all([
           loadRealms(),
@@ -91,11 +98,56 @@ const Dashboard = () => {
           console.error('Failed to fetch guild members:', memberResponse.statusText);
           setGuildMembersDetails([]); 
         }
+
+        // --- Fetch Cartridge Usernames after realms are loaded ---
+        if (loadedRealmsData && loadedRealmsData.length > 0) {
+          const rawOwnerAddresses = Array.from(new Set(loadedRealmsData.map(r => r.owner).filter(Boolean))) as string[];
+          
+          // Normalize addresses on the client-side before sending to the API
+          const normalizedOwnerAddressesForAPI = rawOwnerAddresses
+            .map(addr => normalizeDashboardAddress(addr))
+            .filter((addr): addr is string => !!addr); // Ensure only valid, non-null/undefined strings
+
+          if (normalizedOwnerAddressesForAPI.length > 0) {
+            console.log(`[Dashboard] Fetching Cartridge usernames for ${normalizedOwnerAddressesForAPI.length} normalized addresses...`);
+            // console.log("[Dashboard] Normalized addresses being sent:", normalizedOwnerAddressesForAPI); // Optional: for debugging
+            try {
+              const cartridgeResponse = await fetch('/api/cartridge-usernames', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ addresses: normalizedOwnerAddressesForAPI }), // Send normalized addresses
+              });
+              if (cartridgeResponse.ok) {
+                const usernamesJson: Record<string, string> = await cartridgeResponse.json();
+                const newCartridgeUsernamesMap = new Map<string, string>();
+                for (const address in usernamesJson) {
+                  // Addresses from Cartridge API are already normalized (lowercase, 0x-prefixed)
+                  newCartridgeUsernamesMap.set(address, usernamesJson[address]);
+                }
+                setCartridgeUsernames(newCartridgeUsernamesMap);
+                console.log(`[Dashboard] Fetched ${newCartridgeUsernamesMap.size} Cartridge usernames.`);
+              } else {
+                console.error('[Dashboard] Failed to fetch Cartridge usernames:', cartridgeResponse.statusText);
+                setCartridgeUsernames(new Map()); // Set to empty on error
+              }
+            } catch (cartridgeErr) {
+              console.error('[Dashboard] Error during fetch call to /api/cartridge-usernames:', cartridgeErr);
+              setCartridgeUsernames(new Map()); // Set to empty on error
+            }
+          } else {
+            setCartridgeUsernames(new Map()); // No owner addresses to fetch for
+          }
+        } else {
+          setCartridgeUsernames(new Map()); // No realms loaded
+        }
+        // --- End Cartridge Username Fetch ---
+
       } catch (error) {
         console.error('Error loading initial data:', error);
       } finally {
         setLoading(false);
         setLoadingMembers(false);
+        setLoadingCartridgeUsernames(false); // Set loading to false
       }
     };
     fetchInitialData();
@@ -105,7 +157,10 @@ const Dashboard = () => {
     const map = new Map<string, string>();
     guildMembersDetails.forEach(member => {
       if (member.address && member.username) {
-        map.set(member.address.toLowerCase(), member.username);
+        const normalizedGuildMemberAddress = normalizeDashboardAddress(member.address);
+        if (normalizedGuildMemberAddress) {
+          map.set(normalizedGuildMemberAddress, member.username);
+        }
       }
     });
     setMemberAddressToUsernameMap(map);
@@ -116,27 +171,66 @@ const Dashboard = () => {
     setGuildMemberAddresses(addresses);
   }, [memberAddressToUsernameMap]);
 
+  // --- New: Final combined address to username map (MOVED UP) ---
+  const finalAddressToUsernameMap = useMemo(() => {
+    const combinedMap = new Map<string, string>();
+
+    // 1. Populate with Cartridge usernames (keys are already normalized by API)
+    cartridgeUsernames.forEach((username, address) => {
+        combinedMap.set(address, username);
+    });
+
+    // 2. Override with guild member usernames (these take precedence)
+    // memberAddressToUsernameMap keys are already lowercased
+    memberAddressToUsernameMap.forEach((username, address) => {
+        combinedMap.set(address, username);
+    });
+    console.log(`[Dashboard] finalAddressToUsernameMap created with ${combinedMap.size} entries.`);
+    return combinedMap;
+  }, [cartridgeUsernames, memberAddressToUsernameMap]);
+  // --- End Final Combined Map ---
+
+  // --- Updated uniqueOwnersForFilter to use finalAddressToUsernameMap ---
   const uniqueOwnersForFilter = useMemo(() => {
     const ownersSet = new Set<string>();
     realms.forEach(realm => { if (realm.owner) { ownersSet.add(realm.owner); } });
-    return Array.from(ownersSet)
+    
+    const mappedOwners = Array.from(ownersSet)
       .map(ownerAddress => {
-        const lowerOwnerAddress = ownerAddress.toLowerCase();
-        const username = memberAddressToUsernameMap.get(lowerOwnerAddress);
-        const isGuildMember = !!username;
+        const currentOwnerAddress = ownerAddress || ''; 
+        const normalizedAddr = normalizeDashboardAddress(currentOwnerAddress);
+        
+        const username = normalizedAddr ? finalAddressToUsernameMap.get(normalizedAddr) : undefined;
+        const isGuildMember = normalizedAddr ? memberAddressToUsernameMap.has(normalizedAddr) : false; // Keep for now, might be used elsewhere or for secondary sort
+        
+        let sortKeyBase = username;
+        if (!sortKeyBase && currentOwnerAddress) {
+          sortKeyBase = currentOwnerAddress;
+        }
+
         return {
-          value: ownerAddress,
-          label: username || `${ownerAddress.substring(0, 6)}...${ownerAddress.substring(ownerAddress.length - 4)}`,
+          value: currentOwnerAddress,
+          label: username || (currentOwnerAddress ? `${currentOwnerAddress.substring(0, 6)}...${currentOwnerAddress.substring(currentOwnerAddress.length - 4)}` : 'Unknown Owner'),
           isGuildMember: isGuildMember,
-          sortKey: (isGuildMember ? username : ownerAddress).toLowerCase(), 
+          sortKey: (sortKeyBase || '').toLowerCase(),
+          hasUsername: !!username // Flag if a username exists for this owner
         };
       })
       .sort((a, b) => {
-        if (a.isGuildMember && !b.isGuildMember) return -1;
-        if (!a.isGuildMember && b.isGuildMember) return 1;
+        // Prioritize items with usernames
+        if (a.hasUsername && !b.hasUsername) {
+          return -1; // a comes first
+        }
+        if (!a.hasUsername && b.hasUsername) {
+          return 1; // b comes first
+        }
+        // If both have/don't have usernames, sort by the existing sortKey (username or address)
         return a.sortKey.localeCompare(b.sortKey);
       });
-  }, [realms, memberAddressToUsernameMap]);
+    
+    return mappedOwners;
+  }, [realms, finalAddressToUsernameMap, memberAddressToUsernameMap]); 
+  // --- End Updated uniqueOwnersForFilter ---
 
   const filteredRealms = useMemo(() => {
     return realms.filter(realm => {
@@ -165,11 +259,14 @@ const Dashboard = () => {
   }, [realms, searchTerm, selectedResource, selectedTroop, selectedOwnerFilter, sortBy, filterByGuildMembers, guildMemberAddresses]);
 
   useEffect(() => {
-    if (loading || isRefreshingData) { setIsProcessingFilters(false); return; }
+    if (loading || loadingMembers || loadingCartridgeUsernames || isRefreshingData) {
+      setIsProcessingFilters(false); 
+      return; 
+    }
     setIsProcessingFilters(true);
     const timer = setTimeout(() => { setIsProcessingFilters(false); }, 100);
     return () => clearTimeout(timer);
-  }, [searchTerm, selectedResource, selectedTroop, selectedOwnerFilter, sortBy, loading, isRefreshingData]);
+  }, [searchTerm, selectedResource, selectedTroop, selectedOwnerFilter, sortBy, loading, loadingMembers, loadingCartridgeUsernames, isRefreshingData]);
 
   const summaryRealms = filteredRealms;
 
@@ -244,7 +341,7 @@ const Dashboard = () => {
     XLSX.writeFile(workbook, 's1_passes_export.xlsx');
   };
 
-  if (loading) {
+  if (loading || loadingMembers || loadingCartridgeUsernames) {
     return (
       <div className="dashboard">
         <div className="spinner"></div>
@@ -308,10 +405,19 @@ const Dashboard = () => {
             </div>
             {filteredRealms.map((realm) => {
               const owner = realm.owner || '';
-              const ownerLowercase = owner.toLowerCase();
-              const isGuildMember = guildMemberAddresses.has(ownerLowercase);
-              const displayOwner = isGuildMember ? memberAddressToUsernameMap.get(ownerLowercase) || owner : owner ? `${owner.substring(0, 6)}...${owner.substring(owner.length - 4)}` : '-';
               
+              // --- UPDATED Owner Display Logic ---
+              // Ensure 'owner' is treated as a string for normalizeDashboardAddress
+              const normalizedOwnerForLookup = normalizeDashboardAddress(owner || '');
+              let displayOwnerName = normalizedOwnerForLookup ? finalAddressToUsernameMap.get(normalizedOwnerForLookup) : undefined;
+
+              if (!displayOwnerName && owner) {
+                displayOwnerName = `${owner.substring(0, 6)}...${owner.substring(owner.length - 4)}`;
+              } else if (!displayOwnerName) {
+                displayOwnerName = '-';
+              }
+              // --- End UPDATED Owner Display Logic ---
+
               const resourceNamesForWSC = new Set(realm.resources.map(rDef => rDef.name.toLowerCase()));
               const hasWSC = resourceNamesForWSC.has('wood') && resourceNamesForWSC.has('stone') && resourceNamesForWSC.has('coal');
 
@@ -319,7 +425,7 @@ const Dashboard = () => {
                 <div key={`realm-${realm.id}`} className="realms-list-row">
                   <span className="col-id">{realm.id}</span>
                   <span className="col-name">{realm.name}</span>
-                  <span className="col-owner" title={owner}>{displayOwner}</span>
+                  <span className="col-owner" title={owner}>{displayOwnerName}</span>
                   <span className="col-wsc">{hasWSC ? '✓' : ''}</span>
                   <span className="col-resources">
                     {realm.resources
