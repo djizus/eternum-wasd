@@ -266,27 +266,12 @@ const LiveMapPage: React.FC = () => {
   // Ref for the SVG element
   const svgRef = useRef<SVGSVGElement>(null);
 
-  // REMOVED hexToZoneMap
-  // const hexToZoneMap = useMemo(() => { ... });
-
   const bankSpotsSet = useMemo(() => {
     if (!mapData) return new Set<string>();
     const set = new Set<string>();
     mapData.banks.forEach(bank => set.add(`${bank.originalContractX}-${bank.originalContractY}`));
     return set;
   }, [mapData]);
-
-  // New: Map from normalized member address to username
-  // REMOVED: memberAddressToUsernameMap - will be replaced by finalAddressToUsernameMap
-  // const memberAddressToUsernameMap = useMemo(() => {
-  //   const map = new Map<string, string | undefined>();
-  //   guildMembers.forEach(member => {
-  //     if (member.address) {
-  //       map.set(normalizeAddress(member.address)!, member.username);
-  //     }
-  //   });
-  //   return map;
-  // }, [guildMembers]);
 
   const memberToColorMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -519,7 +504,7 @@ const LiveMapPage: React.FC = () => {
       const [mapResponse, memberResponse, structuresResponse, realmResourceResponse] = await Promise.all([
         fetch('/eternum_all_locations.json'),
         fetch('/api/members'),
-        fetch(`${process.env.NEXT_PUBLIC_GAME_DATA_SQL}?query=select+*+%0Afrom+%22s1_eternum-Structure%22`), // Updated URL
+        fetch('/api/eternum-structures'), // MODIFIED: Use the new API route
         fetch("/api/realms") // Fetch realm resource data
       ]);
 
