@@ -243,54 +243,43 @@ const EternumStructuresPage = () => {
   const combinedAndFilteredStructures = useMemo(() => {
     if (loadingStructures || loadingRealms) return [];
 
-    // If base data is loaded, but usernames are still loading for relevant structures, wait.
     const category1StructuresExist = structures.some(s => s.category === 1);
     if (category1StructuresExist && loadingUsernames) {
-      return []; // This will keep the main loading indicator active
+      return [];
     }
 
     let processedStructures = structures
       .filter(s => s.category === 1)
       .map(structure => {
         const realmsMap = new Map(realmsData.map(r => [r.id, r]));
-        const realmDetail = realmsMap.get(structure.entity_id);
+        const realmDetail = realmsMap.get(structure['metadata.realm_id']);
         const realmName = realmDetail?.name;
-
-        if (!realmName) { // Filter out if no realm name
-          return null;
-        }
+        if (!realmName) return null;
 
         const normalizedOwner = normalizeAddress(structure.owner);
         const username = normalizedOwner ? cartridgeUsernames.get(normalizedOwner) : undefined;
-        const ownerDisplay = username || 
-                             (structure.owner ? `${structure.owner.substring(0, 6)}...${structure.owner.substring(structure.owner.length - 4)}` : 'N/A');
-        
-        const guardTroopsDisplay = parseTroopGuardsFromStructure(structure); // Use the original structure object
+        const ownerDisplay = username || (structure.owner ? `${structure.owner.substring(0, 6)}...${structure.owner.substring(structure.owner.length - 4)}` : 'N/A');
+        const guardTroopsDisplay = parseTroopGuardsFromStructure(structure);
 
         return {
           entity_id: structure.entity_id,
           ownerDisplay: ownerDisplay,
-          category: structure.category,
-          coord_x: structure['base.coord_x'],
-          coord_y: structure['base.coord_y'],
           level: structure['base.level'],
-          realmName: realmName, // realmName is guaranteed here due to filter above
+          realmName: realmName,
           resources: realmDetail?.resources || [],
           availableTroops: realmDetail?.availableTroops || [],
-          originalOwnerAddress: structure.owner, 
+          originalOwnerAddress: structure.owner,
           guardTroopsDisplay: guardTroopsDisplay,
         };
       })
-      .filter((s): s is DisplayableStructure => s !== null) // Remove null entries
-      .sort((a, b) => a.entity_id - b.entity_id);
+      .filter((s): s is DisplayableStructure => s !== null);
 
-    // Apply owner filter if selectedOwnerFromURL is present
     if (selectedOwnerFromURL) {
       processedStructures = processedStructures.filter(
         s => normalizeAddress(s.originalOwnerAddress) === selectedOwnerFromURL
       );
     }
-    return processedStructures;
+    return processedStructures.sort((a, b) => a.entity_id - b.entity_id);
   }, [structures, realmsData, cartridgeUsernames, loadingStructures, loadingRealms, loadingUsernames, selectedOwnerFromURL]);
 
   const isLoading = loadingStructures || loadingRealms || loadingUsernames;
