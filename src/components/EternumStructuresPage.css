@@ -1,0 +1,212 @@
+/* General container styling - can be adjusted */
+.eternum-structures-container {
+  width: 100%;
+  min-height: 100vh;
+  padding: 1rem;
+  background-color: #1a1a1a; /* Match dashboard */
+  color: #ffffff; /* Match dashboard */
+  box-sizing: border-box;
+}
+
+.eternum-structures-container h1 {
+  margin-bottom: 1.5rem;
+  font-size: 1.8rem;
+  color: #e0e0e0;
+  text-align: center;
+}
+
+.eternum-table-container {
+  overflow-x: auto; /* Allows table to scroll horizontally if needed */
+  background-color: #1f1f1f; /* Slightly lighter than page background */
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.eternum-structures-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.eternum-structures-table th,
+.eternum-structures-table td {
+  padding: 0.75rem 1rem; /* Increased padding */
+  text-align: left;
+  border-bottom: 1px solid #333; /* Darker border for rows */
+  white-space: nowrap; /* Keep content on one line by default */
+}
+
+.eternum-structures-table th {
+  background-color: #2a2a2a; /* Header background */
+  color: #b0b0b0; /* Header text color */
+  font-weight: 600;
+  white-space: nowrap;
+  position: sticky; /* Sticky headers */
+  top: 0;
+  z-index: 1;
+}
+
+.eternum-structures-table tbody tr:hover {
+  background-color: #2c2c2c; /* Row hover effect */
+}
+
+.eternum-structures-table td.col-owner,
+.eternum-structures-table td.col-realm-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px; /* Adjust as needed */
+}
+
+/* Styling for resources and troops columns to allow wrapping and apply tags */
+.eternum-structures-table td.col-resources,
+.eternum-structures-table td.col-troops,
+.eternum-structures-table td.col-guard-troops { /* Added col-guard-troops */
+  white-space: normal; /* Allow content to wrap */
+  min-width: 180px; /* Adjusted min-width slightly */
+  vertical-align: top; /* Align content to the top for multi-line cells */
+}
+
+/* Copied and adapted from Dashboard.css */
+.resource-pair, .troop-tag {
+  display: inline-block; /* Changed from flex to inline-block for easier wrapping in table cells */
+  background: #232323;
+  border-radius: 4px; /* Unified border-radius */
+  padding: 0.2rem 0.5rem; /* Unified padding */
+  font-size: 0.9em; /* Slightly smaller font for tags */
+  color: #b0b0b0;
+  margin: 2px; /* Add small margin around tags */
+  line-height: 1.4; /* Improve readability of wrapped tags */
+}
+
+.resource-pair[data-rarity="common"] {
+  color: #b8e994;
+  background: #23321a;
+  border: 1px solid #3a5c2a;
+}
+.resource-pair[data-rarity="rare"] {
+  color: #8ec6ff;
+  background: #1a2633;
+  border: 1px solid #2a4a6a;
+}
+.resource-pair[data-rarity="epic"] {
+  color: #e0aaff;
+  background: #2a1a33;
+  border: 1px solid #5c2a6a;
+}
+.resource-pair[data-rarity="legendary"] {
+  color: #ffd166;
+  background: #332a1a;
+  border: 1px solid #6a5c2a;
+}
+
+.troop-tag[data-tier="T1"] {
+  color: #fff;
+  background-color: #4a7a4a; /* Solid color from Dashboard.css */
+  border: 1px solid #3a6a3a;
+}
+.troop-tag[data-tier="T2"] {
+  color: #fff;
+  background-color: #5a5aa8; /* Solid color from Dashboard.css */
+  border: 1px solid #4a4a9a;
+}
+.troop-tag[data-tier="T3"] {
+  color: #fff;
+  background-color: #8a3a8a; /* Solid color from Dashboard.css */
+  border: 1px solid #7a2a7a;
+}
+.troop-tag[data-tier="unknown"] {
+  color: #ccc;
+  background-color: #666666;
+  border: 1px solid #555555;
+}
+
+/* Loading and error messages */
+.loading-message, .error-message, .no-data-message {
+  text-align: center;
+  padding: 2rem;
+  font-size: 1.1rem;
+}
+
+.error-message {
+  color: #ff6b6b; /* Red for errors */
+}
+.warning-message {
+  color: #ffa500; /* Orange for warnings */
+  padding: 1rem;
+  text-align: center;
+  background-color: rgba(255, 165, 0, 0.1);
+  border: 1px solid rgba(255, 165, 0, 0.3);
+  border-radius: 4px;
+  margin: 1rem;
+}
+
+/* Styling for individual guard troop entries */
+.guard-troop-entry {
+  display: block; /* Each troop on a new line */
+  padding: 2px 0; /* Small padding for readability */
+  font-size: 0.9em;
+  color: #c0c0c0; /* Light grey color for guard troop text */
+}
+
+.guard-troop-entry:not(:last-child) {
+  margin-bottom: 2px; /* Space between troop entries if multiple */
+}
+
+/* Ensure the N/A span in guard troops column is styled consistently */
+.eternum-structures-table td.col-guard-troops span {
+    font-size: 0.9em;
+    color: #777;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .eternum-structures-container h1 {
+    font-size: 1.5rem;
+  }
+  .eternum-structures-table {
+    font-size: 0.9rem;
+  }
+  .eternum-structures-table th,
+  .eternum-structures-table td {
+    padding: 0.6rem 0.8rem;
+  }
+  .resource-pair, .troop-tag {
+    font-size: 0.85em;
+    padding: 0.15rem 0.4rem;
+  }
+}
+
+/* Filters Styling */
+.filters-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 0.5rem;
+  background-color: #232323; /* Slightly different background for filter area */
+  border-radius: 6px;
+}
+
+.filter-item {
+  display: flex;
+  flex-direction: column; /* Stack label on top of select */
+  gap: 0.3rem;
+}
+
+.filter-item label {
+  font-size: 0.9rem;
+  color: #b0b0b0;
+  margin-bottom: 0.1rem;
+}
+
+.filter-item select {
+  padding: 0.5rem 0.8rem;
+  border-radius: 4px;
+  border: 1px solid #333;
+  background: #2a2a2a;
+  color: #fff;
+  font-size: 0.9rem;
+  min-width: 200px; /* Give select some width */
+} 

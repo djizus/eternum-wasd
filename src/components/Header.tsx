@@ -30,6 +30,12 @@ const Header: React.FC = () => {
                 Live Map
               </Link>
               <Link 
+                href="/eternum-structures" 
+                className={`nav-link ${pathname === '/eternum-structures' ? 'active' : ''}`}
+              >
+                Live Realms Dashboard
+              </Link>
+              <Link 
                 href="/season-passes" 
                 className={`nav-link ${pathname === '/season-passes' ? 'active' : ''}`}
               >
