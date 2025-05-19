@@ -108,6 +108,36 @@ interface OwnerFilterOption {
   label: string; // Username or truncated address
 }
 
+// Add this helper function before the component
+const downloadCSV = (data: string, filename: string) => {
+  const blob = new Blob([data], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+// Helper to sum all troop_guards.*.count for a structure
+function getTotalGuardTroops(structure: EternumStructureFromAPI): number {
+  let total = 0;
+  for (const key in structure) {
+    if (key.startsWith('troop_guards.') && key.endsWith('.count')) {
+      const countHex = structure[key] as string;
+      if (typeof countHex === 'string' && countHex.startsWith('0x')) {
+        const count = parseInt(countHex, 16) / 1e9;
+        if (!isNaN(count)) {
+          total += count;
+        }
+      }
+    }
+  }
+  return total;
+}
+
 const EternumStructuresPage = () => {
   const router = useRouter();
   const pathname = usePathname();
@@ -123,6 +153,15 @@ const EternumStructuresPage = () => {
 
   // Selected owner from URL, defaults to null if not present
   const selectedOwnerFromURL = useMemo(() => searchParams.get('owner'), [searchParams]);
+
+  // New: Guard filter state from URL
+  const guardFilterFromURL = useMemo(() => searchParams.get('guardFilter') === '1', [searchParams]);
+  const [guardFilter, setGuardFilter] = useState(guardFilterFromURL);
+
+  // Sync state with URL
+  useEffect(() => {
+    setGuardFilter(guardFilterFromURL);
+  }, [guardFilterFromURL]);
 
   useEffect(() => {
     const fetchStructures = async () => {
@@ -240,27 +279,43 @@ const EternumStructuresPage = () => {
     router.push(`${pathname}?${params.toString()}`);
   }, [router, pathname, searchParams]);
 
+  // Handler for guard filter toggle
+  const handleGuardFilterChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = event.target.checked;
+    setGuardFilter(checked);
+    const params = new URLSearchParams(searchParams.toString());
+    if (checked) {
+      params.set('guardFilter', '1');
+    } else {
+      params.delete('guardFilter');
+    }
+    router.push(`${pathname}?${params.toString()}`);
+  }, [router, pathname, searchParams]);
+
   const combinedAndFilteredStructures = useMemo(() => {
     if (loadingStructures || loadingRealms) return [];
-
     const category1StructuresExist = structures.some(s => s.category === 1);
     if (category1StructuresExist && loadingUsernames) {
       return [];
     }
-
     let processedStructures = structures
       .filter(s => s.category === 1)
+      // New: Guard filter logic
+      .filter(s => {
+        if (!guardFilter) return true;
+        if (s['base.troop_guard_count'] === 0) return true;
+        const totalGuards = getTotalGuardTroops(s);
+        return totalGuards < 500;
+      })
       .map(structure => {
         const realmsMap = new Map(realmsData.map(r => [r.id, r]));
         const realmDetail = realmsMap.get(structure['metadata.realm_id']);
         const realmName = realmDetail?.name;
         if (!realmName) return null;
-
         const normalizedOwner = normalizeAddress(structure.owner);
         const username = normalizedOwner ? cartridgeUsernames.get(normalizedOwner) : undefined;
         const ownerDisplay = username || (structure.owner ? `${structure.owner.substring(0, 6)}...${structure.owner.substring(structure.owner.length - 4)}` : 'N/A');
         const guardTroopsDisplay = parseTroopGuardsFromStructure(structure);
-
         return {
           entity_id: structure.entity_id,
           ownerDisplay: ownerDisplay,
@@ -273,14 +328,57 @@ const EternumStructuresPage = () => {
         };
       })
       .filter((s): s is DisplayableStructure => s !== null);
-
     if (selectedOwnerFromURL) {
       processedStructures = processedStructures.filter(
         s => normalizeAddress(s.originalOwnerAddress) === selectedOwnerFromURL
       );
     }
     return processedStructures.sort((a, b) => a.entity_id - b.entity_id);
-  }, [structures, realmsData, cartridgeUsernames, loadingStructures, loadingRealms, loadingUsernames, selectedOwnerFromURL]);
+  }, [structures, realmsData, cartridgeUsernames, loadingStructures, loadingRealms, loadingUsernames, selectedOwnerFromURL, guardFilter]);
+
+  const handleExportToExcel = useCallback(() => {
+    if (combinedAndFilteredStructures.length === 0) return;
+
+    // Define headers
+    const headers = [
+      'Entity ID',
+      'Owner',
+      'Owner Address',
+      'Level',
+      'Realm Name',
+      'Resources',
+      'Available Troops',
+      'Guard Troops'
+    ];
+
+    // Convert data to CSV rows
+    const rows = combinedAndFilteredStructures.map(structure => [
+      structure.entity_id,
+      structure.ownerDisplay,
+      structure.originalOwnerAddress,
+      structure.level,
+      structure.realmName,
+      structure.resources
+        .filter(rDef => rDef.rarity !== 'troop')
+        .map(rDef => rDef.name)
+        .join(', '),
+      structure.availableTroops.join(', '),
+      structure.guardTroopsDisplay ? structure.guardTroopsDisplay.join('; ') : 'N/A'
+    ]);
+
+    // Combine headers and rows
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    // Generate filename with current date
+    const date = new Date().toISOString().split('T')[0];
+    const filename = `eternum-structures-${date}.csv`;
+
+    // Trigger download
+    downloadCSV(csvContent, filename);
+  }, [combinedAndFilteredStructures]);
 
   const isLoading = loadingStructures || loadingRealms || loadingUsernames;
 
@@ -318,7 +416,26 @@ const EternumStructuresPage = () => {
             ))}
           </select>
         </div>
-        {/* Placeholder for more filters */}
+        <div className="filter-item">
+          <button 
+            onClick={handleExportToExcel}
+            disabled={combinedAndFilteredStructures.length === 0}
+            className="export-button"
+          >
+            Export to Excel
+          </button>
+        </div>
+        <div className="filter-item">
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="checkbox"
+              checked={guardFilter}
+              onChange={handleGuardFilterChange}
+              style={{ marginRight: 6 }}
+            />
+            Only realms with no guards or &lt; 500 total guard troops
+          </label>
+        </div>
       </div>
 
       <div className="eternum-table-container">
@@ -343,8 +460,8 @@ const EternumStructuresPage = () => {
                 <td className="col-realm-name">{structure.realmName}</td>
                 <td className="col-resources">
                   {structure.resources
-                    .filter(rDef => rDef.rarity !== 'troop') 
-                    .sort((a, b) => { 
+                    .filter(rDef => rDef.rarity !== 'troop')
+                    .sort((a, b) => {
                       if (a.id < b.id) return -1;
                       if (a.id > b.id) return 1;
                       return a.name.localeCompare(b.name);
@@ -352,7 +469,7 @@ const EternumStructuresPage = () => {
                     .map((rDef) => (
                       <span
                         key={`resource-${structure.entity_id}-${rDef.id}`}
-                        className="resource-pair" 
+                        className="resource-pair"
                         data-rarity={rDef.rarity}
                       >
                         {rDef.name}
@@ -392,7 +509,7 @@ const EternumStructuresPage = () => {
       </div>
       {isLoading && combinedAndFilteredStructures.length > 0 && (
         <div className="loading-message"><p>Updating data...</p></div>
-      )}    
+      )}
     </div>
   );
 };

@@ -209,4 +209,24 @@
   color: #fff;
   font-size: 0.9rem;
   min-width: 200px; /* Give select some width */
+}
+
+.export-button {
+  background-color: #4CAF50;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.export-button:hover {
+  background-color: #45a049;
+}
+
+.export-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
 } 

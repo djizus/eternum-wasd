@@ -657,17 +657,6 @@ const LiveMapPage: React.FC = () => {
     fetchMapData();
   }, []);
 
-  // Set up interval for refreshing data every 5 minutes
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      console.log("[liveMapPage] Refreshing map data via interval...");
-      fetchMapData(); // Call the fetch function
-    }, 300000); // 5 minutes in milliseconds (5 * 60 * 1000)
-
-    // Cleanup function to clear the interval when the component unmounts
-    return () => clearInterval(intervalId);
-  }, []); // Empty dependency array ensures this effect runs only once on mount
-
   // Calculate the base viewbox needed to contain all elements
   const baseViewBox = useMemo(() => {
     if (!mapData) return null;
