@@ -5,6 +5,9 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import './EternumStructuresPage.css'; // Import the new CSS file
 import { loadRealms } from '../services/realms'; // To fetch detailed realm data
 import type { Realm as RealmDetails, ResourceDefinition } from '../types/resources'; // Types for realm and resources
+import type { StructureResourceInfo as BaseStructureResourceInfo } from '../app/api/structures-resources/route';
+
+type StructureResourceInfo = BaseStructureResourceInfo & { [key: string]: unknown };
 
 // Helper to normalize addresses (similar to Dashboard.tsx)
 const normalizeAddress = (address: string | undefined): string | undefined => {
@@ -181,6 +184,28 @@ function getTotalGuardTroops(structure: EternumStructureFromAPI): number {
   return total;
 }
 
+// ---- START ARMIES STATE ----
+interface ArmyInfo {
+  "coord.x": number;
+  "coord.y": number;
+  explorer_id: number;
+  internal_created_at: string;
+  internal_entity_id: string;
+  internal_event_id: string;
+  internal_event_message_id: string | null;
+  internal_executed_at: string;
+  internal_id: string;
+  internal_updated_at: string;
+  owner: number;
+  "troops.category": string;
+  "troops.count": string;
+  "troops.stamina.amount": string;
+  "troops.stamina.updated_tick": string;
+  "troops.tier": string;
+  [key: string]: unknown;
+}
+// ---- END ARMIES STATE ----
+
 const EternumStructuresPage = () => {
   const router = useRouter();
   const pathname = usePathname();
@@ -193,6 +218,10 @@ const EternumStructuresPage = () => {
   const [loadingRealms, setLoadingRealms] = useState(true);
   const [loadingUsernames, setLoadingUsernames] = useState(false); // Initially false, true when fetching
   const [error, setError] = useState<string | null>(null);
+
+  // ---- START ARMIES STATE HOOKS ----
+  const [armies, setArmies] = useState<ArmyInfo[]>([]);
+  // ---- END ARMIES STATE HOOKS ----
 
   // ---- START TRIBE STATE ----
   const [processedGuilds, setProcessedGuilds] = useState<Map<string, ProcessedGuildInfo>>(new Map());
@@ -300,6 +329,25 @@ const EternumStructuresPage = () => {
     fetchStructures();
     fetchRealms();
     fetchTribes(); // Call fetchTribes
+
+    // ---- START FETCH ARMIES ----
+    const fetchArmies = async () => {
+      try {
+        const response = await fetch('/api/armies');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Error fetching armies: ${response.statusText}`);
+        }
+        const data: ArmyInfo[] = await response.json();
+        setArmies(data);
+      } catch (err: unknown) {
+        console.error('Failed to load armies:', err);
+        const message = err instanceof Error ? err.message : 'An unknown error occurred while fetching armies.';
+        setError(prevError => prevError ? `${prevError}\n[Armies] ${message}` : `[Armies] ${message}`);
+      }
+    };
+    fetchArmies();
+    // ---- END FETCH ARMIES ----
   }, []);
 
   useEffect(() => {
@@ -434,6 +482,32 @@ const EternumStructuresPage = () => {
     router.push(`${pathname}?${params.toString()}`);
   }, [router, pathname, searchParams]);
 
+  // ---- START STRUCTURE RESOURCES STATE ----
+  const [structureResources, setStructureResources] = useState<StructureResourceInfo[]>([]);
+  // ---- END STRUCTURE RESOURCES STATE ----
+
+  useEffect(() => {
+    // ... existing code ...
+    // ---- START FETCH STRUCTURE RESOURCES ----
+    const fetchStructureResources = async () => {
+      try {
+        const response = await fetch('/api/structures-resources');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Error fetching structure resources: ${response.statusText}`);
+        }
+        const data: StructureResourceInfo[] = await response.json();
+        setStructureResources(data);
+      } catch (err: unknown) {
+        console.error('Failed to load structure resources:', err);
+        const message = err instanceof Error ? err.message : 'An unknown error occurred while fetching structure resources.';
+        setError(prevError => prevError ? `${prevError}\n[Structure Resources] ${message}` : `[Structure Resources] ${message}`);
+      }
+    };
+    fetchStructureResources();
+    // ---- END FETCH STRUCTURE RESOURCES ----
+  }, []);
+
   const combinedAndFilteredStructures = useMemo(() => {
     // Initial guard: If foundational data is still loading and not yet available, return empty.
     if ((loadingStructures && structures.length === 0) || 
@@ -476,8 +550,18 @@ const EternumStructuresPage = () => {
         const tribeName = tribeInfo?.guildName;
         const tribeId = tribeInfo?.guildId; // Get tribeId for filtering
 
+        // ---- START DEPLOYED TROOPS MATCHING ----
+        const deployedTroops = armies.filter(army =>
+          army.owner === structure.entity_id
+        );
+        // ---- END DEPLOYED TROOPS MATCHING ----
+
+        // ---- START STRUCTURE RESOURCE MATCHING ----
+        const structureResource = structureResources.find(r => r.entity_id === structure.entity_id);
+        // ---- END STRUCTURE RESOURCE MATCHING ----
+
         // Explicitly return type that matches DisplayableStructure or null
-        const displayableObj: Omit<DisplayableStructure, 'category' | 'coord_x' | 'coord_y'> & { entity_id: number, ownerTribeId?: string } = {
+        const displayableObj: Omit<DisplayableStructure, 'category' | 'coord_x' | 'coord_y'> & { entity_id: number, ownerTribeId?: string, deployedTroops?: ArmyInfo[], structureResource?: StructureResourceInfo } = {
           entity_id: structure.entity_id,
           ownerDisplay: ownerDisplay,
           level: structure['base.level'],
@@ -489,14 +573,16 @@ const EternumStructuresPage = () => {
           villagesCount: villagesCount, 
           tribeName: tribeName, 
           ownerTribeId: tribeId, // Add owner's tribe ID to the mapped object
+          deployedTroops: deployedTroops,
+          structureResource: structureResource,
         };
-        return displayableObj as DisplayableStructure & { ownerTribeId?: string }; // Cast here after ensuring all required fields are present
+        return displayableObj as DisplayableStructure & { ownerTribeId?: string, deployedTroops?: ArmyInfo[], structureResource?: StructureResourceInfo }; // Cast here after ensuring all required fields are present
       })
       .filter(s => s !== null); // Filter out nulls first
 
     // Now, mappedStructures is an array of non-null DisplayableStructure objects (potentially empty)
     // So, we can safely cast it for further operations if needed, or use directly.
-    let fullyProcessedStructures = mappedStructures as Array<DisplayableStructure & { ownerTribeId?: string }>;
+    let fullyProcessedStructures = mappedStructures as Array<DisplayableStructure & { ownerTribeId?: string, deployedTroops?: ArmyInfo[], structureResource?: StructureResourceInfo }>;
 
     if (selectedOwnerFromURL) {
       fullyProcessedStructures = fullyProcessedStructures.filter(
@@ -537,7 +623,9 @@ const EternumStructuresPage = () => {
     selectedOwnerFromURL, 
     selectedTribeIdFromURL, // Add selectedTribeIdFromURL to dependencies
     guardFilter,
-    playerToTribeMap
+    playerToTribeMap,
+    armies,
+    structureResources // Add as dependency
   ]);
 
   const handleExportToExcel = useCallback(() => {
@@ -552,7 +640,8 @@ const EternumStructuresPage = () => {
       'Tribe',    // New Header
       'Resources',
       'Available Troops',
-      'Guard Troops'
+      'Guard Troops',
+      'Resources/Production'
     ];
     const rows = combinedAndFilteredStructures.map(structure => [
       structure.entity_id,
@@ -567,7 +656,43 @@ const EternumStructuresPage = () => {
         .map(rDef => rDef.name)
         .join(', '),
       structure.availableTroops.join(', '),
-      structure.guardTroopsDisplay ? structure.guardTroopsDisplay.join('; ') : 'N/A'
+      structure.guardTroopsDisplay ? structure.guardTroopsDisplay.join('; ') : 'N/A',
+      structure.structureResource ? (
+        <div style={{ maxHeight: 120, overflowY: 'auto', fontSize: '0.95em' }}>
+          {Object.keys(structure.structureResource ?? {})
+            .filter(key => key.endsWith('_BALANCE'))
+            .map((balanceKey) => {
+              const resource = balanceKey.replace('_BALANCE', '');
+              if (resource === 'WHEAT' || resource === 'FISH') return null;
+              const balance = structure.structureResource?.[balanceKey] as string;
+              const prodKey = resource + '_PRODUCTION';
+              const prod = structure.structureResource?.[prodKey];
+              let prodRate = '';
+              let prodRateNum = 0;
+              if (
+                prod &&
+                typeof prod === 'object' &&
+                prod !== null &&
+                'production_rate' in prod &&
+                typeof (prod as { production_rate: string }).production_rate === 'string'
+              ) {
+                const rate = parseInt((prod as { production_rate: string }).production_rate, 16) / 1e9;
+                prodRateNum = !isNaN(rate) ? rate : 0;
+                prodRate = !isNaN(rate) ? rate.toLocaleString() : '0';
+              }
+              const balNum = parseInt(balance, 16) / 1e9;
+              const balStr = !isNaN(balNum) ? balNum.toLocaleString() : '0';
+              if (balNum === 0 && prodRateNum === 0) return null;
+              return (
+                <div key={balanceKey} style={{ whiteSpace: 'nowrap' }}>
+                  <b>{resource}</b>: {balStr} (prod: {prodRate})
+                </div>
+              );
+            })}
+        </div>
+      ) : (
+        <span>N/A</span>
+      )
     ]);
 
     // Combine headers and rows
@@ -669,6 +794,8 @@ const EternumStructuresPage = () => {
               <th>Resources</th>
               <th>Troops (Available)</th>
               <th>Guard Troops</th>
+              <th>Deployed Troops</th>
+              <th>Resources/Production</th>
             </tr>
           </thead>
           <tbody>
@@ -720,6 +847,59 @@ const EternumStructuresPage = () => {
                         {troopEntry}
                       </div>
                     ))
+                  ) : (
+                    <span>N/A</span>
+                  )}
+                </td>
+                <td className="col-deployed-troops">
+                  {structure.deployedTroops && structure.deployedTroops.length > 0 ? (
+                    structure.deployedTroops.map((army, idx) => {
+                      const count = parseInt(army["troops.count"], 16) / 1e9;
+                      const formattedCount = !isNaN(count) ? count.toLocaleString() : '0';
+                      return (
+                        <div key={`deployed-troop-${structure.entity_id}-${idx}`} className="guard-troop-entry">
+                          {formattedCount} {army["troops.category"]}{army["troops.tier"]}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <span>N/A</span>
+                  )}
+                </td>
+                <td className="col-structure-resources">
+                  {structure.structureResource ? (
+                    <div style={{ maxHeight: 120, overflowY: 'auto', fontSize: '0.95em' }}>
+                      {Object.keys(structure.structureResource ?? {})
+                        .filter(key => key.endsWith('_BALANCE'))
+                        .map((balanceKey) => {
+                          const resource = balanceKey.replace('_BALANCE', '');
+                          if (resource === 'WHEAT' || resource === 'FISH') return null;
+                          const balance = structure.structureResource?.[balanceKey] as string;
+                          const prodKey = resource + '_PRODUCTION';
+                          const prod = structure.structureResource?.[prodKey];
+                          let prodRate = '';
+                          let prodRateNum = 0;
+                          if (
+                            prod &&
+                            typeof prod === 'object' &&
+                            prod !== null &&
+                            'production_rate' in prod &&
+                            typeof (prod as { production_rate: string }).production_rate === 'string'
+                          ) {
+                            const rate = parseInt((prod as { production_rate: string }).production_rate, 16) / 1e9;
+                            prodRateNum = !isNaN(rate) ? rate : 0;
+                            prodRate = !isNaN(rate) ? rate.toLocaleString() : '0';
+                          }
+                          const balNum = parseInt(balance, 16) / 1e9;
+                          const balStr = !isNaN(balNum) ? balNum.toLocaleString() : '0';
+                          if (balNum === 0 && prodRateNum === 0) return null;
+                          return (
+                            <div key={balanceKey} style={{ whiteSpace: 'nowrap' }}>
+                              <b>{resource}</b>: {balStr} (prod: {prodRate})
+                            </div>
+                          );
+                        })}
+                    </div>
                   ) : (
                     <span>N/A</span>
                   )}
