@@ -181,26 +181,31 @@
 /* Filters Styling */
 .filters-container {
   display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
+  flex-wrap: wrap; /* Allow items to wrap to next line on smaller screens */
+  align-items: flex-end; /* Align items to the bottom of the container */
+  gap: 1rem; /* Space between filter items */
   margin-bottom: 1.5rem;
-  padding: 0.5rem;
-  background-color: #232323; /* Slightly different background for filter area */
+  padding: 1rem; /* Add some padding around the filters */
+  background-color: #232323;
   border-radius: 6px;
 }
 
 .filter-item {
   display: flex;
-  flex-direction: column; /* Stack label on top of select */
-  gap: 0.3rem;
+  /* Default to row, override for specific items if needed */
+  flex-direction: row; 
+  align-items: center; /* Vertically center items in the row */
+  gap: 0.5rem; /* Space between label and control, or among elements in a complex item */
 }
 
+/* Style for labels within filter items */
 .filter-item label {
   font-size: 0.9rem;
   color: #b0b0b0;
-  margin-bottom: 0.1rem;
+  /* Removed margin-bottom as gap property on .filter-item handles spacing */
 }
 
+/* Keep select styling as is, it should work fine with flex row */
 .filter-item select {
   padding: 0.5rem 0.8rem;
   border-radius: 4px;
@@ -208,18 +213,24 @@
   background: #2a2a2a;
   color: #fff;
   font-size: 0.9rem;
-  min-width: 200px; /* Give select some width */
+  min-width: 180px; /* Adjusted min-width slightly */
 }
+
+/* Specific adjustment for the checkbox filter item if its label needs to be on top */
+/* Or if the default .filter-item (row, align-items: center) works well enough, this can be removed */
+/* For now, let the general .filter-item style apply. The inline style on the checkbox label should handle its internal alignment. */
 
 .export-button {
   background-color: #4CAF50;
   color: white;
-  padding: 8px 16px;
+  padding: 0.5rem 1rem; /* Match select padding for vertical alignment */
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 0.9rem; /* Match select font size */
   transition: background-color 0.2s;
+  height: calc(0.5rem * 2 + 0.9rem * 1.2 + 2px); /* Approx to match select height: padding + line-height + border */
+  box-sizing: border-box;
 }
 
 .export-button:hover {

@@ -46,6 +46,23 @@ interface EternumStructureFromAPI {
   [key: string]: unknown; 
 }
 
+// ---- START TRIBE INTERFACES ----
+interface TribeMemberInfo { // From /api/tribes
+  guild_id: string;
+  member: string; // Player address
+  name: string;   // Hex-encoded guild name
+  member_count: number;
+  [key: string]: unknown;
+}
+
+interface ProcessedGuildInfo {
+  id: string; // guild_id
+  name: string; // Decoded name
+  members: string[]; // Array of normalized member addresses
+  memberCount: number;
+}
+// ---- END TRIBE INTERFACES ----
+
 // Combined data structure for display
 interface DisplayableStructure {
   entity_id: number;
@@ -59,6 +76,8 @@ interface DisplayableStructure {
   availableTroops: string[];
   originalOwnerAddress: string; // Linter fix: was string? now string
   guardTroopsDisplay: string[] | null; // New field for guard troops
+  villagesCount: number;
+  tribeName?: string; // Optional: player might not be in a tribe
 }
 
 // Helper Function to Parse Troop Guards (adapted from LiveMapPage.tsx)
@@ -102,6 +121,30 @@ function parseTroopGuardsFromStructure(structureData: EternumStructureFromAPI | 
   }
   return null;
 }
+
+// ---- START hexToAscii HELPER ----
+function hexToAscii(hexString: string): string {
+  if (!hexString || typeof hexString !== 'string') {
+    return "Unknown Name";
+  }
+  const cleanHexString = hexString.startsWith('0x') ? hexString.slice(2) : hexString;
+  const finalHexString = cleanHexString.length % 2 !== 0 ? '0' + cleanHexString : cleanHexString;
+  let asciiString = '';
+  try {
+    for (let i = 0; i < finalHexString.length; i += 2) {
+      const charCode = parseInt(finalHexString.substring(i, i + 2), 16);
+      if (charCode > 0) { 
+          asciiString += String.fromCharCode(charCode);
+      }
+    }
+    const trimmed = asciiString.replace(/\0+$/, '').trim();
+    return trimmed.length > 0 ? trimmed : "Unnamed Tribe";
+  } catch (e) {
+    console.error("Error converting hex to ASCII:", hexString, e);
+    return "Invalid Name";
+  }
+}
+// ---- END hexToAscii HELPER ----
 
 interface OwnerFilterOption {
   value: string; // Normalized address
@@ -151,12 +194,24 @@ const EternumStructuresPage = () => {
   const [loadingUsernames, setLoadingUsernames] = useState(false); // Initially false, true when fetching
   const [error, setError] = useState<string | null>(null);
 
+  // ---- START TRIBE STATE ----
+  const [processedGuilds, setProcessedGuilds] = useState<Map<string, ProcessedGuildInfo>>(new Map());
+  const [loadingTribes, setLoadingTribes] = useState(true);
+  // Error state for tribes can be combined with the main `error` state or separate
+  // For simplicity, using the main `error` state and appending context like [Tribes]
+  // ---- END TRIBE STATE ----
+
   // Selected owner from URL, defaults to null if not present
   const selectedOwnerFromURL = useMemo(() => searchParams.get('owner'), [searchParams]);
 
   // New: Guard filter state from URL
   const guardFilterFromURL = useMemo(() => searchParams.get('guardFilter') === '1', [searchParams]);
   const [guardFilter, setGuardFilter] = useState(guardFilterFromURL);
+
+  // ---- START TRIBE FILTER STATE ----
+  const selectedTribeIdFromURL = useMemo(() => searchParams.get('tribeId'), [searchParams]);
+  // No local state for selectedTribeId needed, directly use from URL for filtering
+  // ---- END TRIBE FILTER STATE ----
 
   // Sync state with URL
   useEffect(() => {
@@ -198,8 +253,53 @@ const EternumStructuresPage = () => {
       }
     };
 
+    // ---- START FETCH TRIBES ----
+    const fetchTribes = async () => {
+      setLoadingTribes(true);
+      try {
+        const response = await fetch('/api/tribes');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Error fetching tribes: ${response.statusText}`);
+        }
+        const data: TribeMemberInfo[] = await response.json();
+        // setRawTribesData(data); // rawTribesData is not used, so commenting out or removing
+
+        // Process tribes data into a map of guildId to ProcessedGuildInfo
+        const guilds = new Map<string, ProcessedGuildInfo>();
+        data.forEach(memberInfo => {
+          const normalizedMemberAddr = normalizeAddress(memberInfo.member);
+          if (!normalizedMemberAddr) return; 
+
+          if (!guilds.has(memberInfo.guild_id)) {
+            guilds.set(memberInfo.guild_id, {
+              id: memberInfo.guild_id,
+              name: hexToAscii(memberInfo.name), // Decode hex name
+              members: [],
+              memberCount: memberInfo.member_count || 0,
+            });
+          }
+          const guild = guilds.get(memberInfo.guild_id)!;
+          if (!guild.members.includes(normalizedMemberAddr)) {
+            guild.members.push(normalizedMemberAddr);
+          }
+          guild.memberCount = Math.max(guild.memberCount, memberInfo.member_count || 0);
+        });
+        setProcessedGuilds(guilds);
+
+      } catch (err: unknown) {
+        console.error('Failed to load tribes data:', err);
+        const message = err instanceof Error ? err.message : 'An unknown error occurred while fetching tribes.';
+        setError(prevError => prevError ? `${prevError}\n[Tribes] ${message}` : `[Tribes] ${message}`);
+      } finally {
+        setLoadingTribes(false);
+      }
+    };
+    // ---- END FETCH TRIBES ----
+
     fetchStructures();
     fetchRealms();
+    fetchTribes(); // Call fetchTribes
   }, []);
 
   useEffect(() => {
@@ -249,6 +349,35 @@ const EternumStructuresPage = () => {
     fetchUsernames(); 
   }, [structures, loadingStructures]); // Dependency remains on structures and its loading state
 
+  // ---- START playerToTribeMap ----
+  const playerToTribeMap = useMemo(() => {
+    const map = new Map<string, { guildId: string, guildName: string }>();
+    if (processedGuilds.size === 0) return map;
+    processedGuilds.forEach(guild => {
+      guild.members.forEach(memberAddress => {
+        map.set(memberAddress, { 
+          guildId: guild.id, 
+          guildName: guild.name, 
+        });
+      });
+    });
+    return map;
+  }, [processedGuilds]);
+  // ---- END playerToTribeMap ----
+
+  // ---- START UNIQUE TRIBE OPTIONS FOR FILTER ----
+  const uniqueTribeOptions = useMemo(() => {
+    if (processedGuilds.size === 0) return [];
+    const options: Array<{ value: string; label: string }> = Array.from(processedGuilds.values())
+      .map(guild => ({
+        value: guild.id,
+        label: guild.name || 'Unnamed Tribe',
+      }))
+      .sort((a, b) => a.label.toLowerCase().localeCompare(b.label.toLowerCase()));
+    return options;
+  }, [processedGuilds]);
+  // ---- END UNIQUE TRIBE OPTIONS FOR FILTER ----
+
   const uniqueOwnerOptions = useMemo(() => {
     // This can still compute based on available structures and usernames map,
     // it doesn't need to wait for loadingUsernames to be false.
@@ -279,6 +408,19 @@ const EternumStructuresPage = () => {
     router.push(`${pathname}?${params.toString()}`);
   }, [router, pathname, searchParams]);
 
+  // ---- START TRIBE FILTER CHANGE HANDLER ----
+  const handleTribeFilterChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
+    const newTribeId = event.target.value;
+    const params = new URLSearchParams(searchParams.toString());
+    if (newTribeId) {
+      params.set('tribeId', newTribeId);
+    } else {
+      params.delete('tribeId');
+    }
+    router.push(`${pathname}?${params.toString()}`);
+  }, [router, pathname, searchParams]);
+  // ---- END TRIBE FILTER CHANGE HANDLER ----
+
   // Handler for guard filter toggle
   const handleGuardFilterChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const checked = event.target.checked;
@@ -293,30 +435,49 @@ const EternumStructuresPage = () => {
   }, [router, pathname, searchParams]);
 
   const combinedAndFilteredStructures = useMemo(() => {
-    if (loadingStructures || loadingRealms) return [];
-    const category1StructuresExist = structures.some(s => s.category === 1);
-    if (category1StructuresExist && loadingUsernames) {
+    // Initial guard: If foundational data is still loading and not yet available, return empty.
+    if ((loadingStructures && structures.length === 0) || 
+        (loadingRealms && realmsData.length === 0)) {
       return [];
     }
-    let processedStructures = structures
+
+    // If foundational data is present, but enrichment data (usernames, tribes) is loading for category 1 structures,
+    // also return empty to prevent showing items before they are fully processed.
+    const category1StructuresExist = structures.some(s => s.category === 1);
+    if (category1StructuresExist && (loadingUsernames || loadingTribes)) {
+      return [];
+    }
+
+    const mappedStructures = structures
       .filter(s => s.category === 1)
-      // New: Guard filter logic
-      .filter(s => {
+      .filter(s => { // Guard filter
         if (!guardFilter) return true;
-        if (s['base.troop_guard_count'] === 0) return true;
-        const totalGuards = getTotalGuardTroops(s);
-        return totalGuards < 500;
+        
+        const noGuards = s['base.troop_guard_count'] === 0;
+        const lowGuards = getTotalGuardTroops(s) <= 900;
+        const fewVillages = (s['metadata.villages_count'] || 0) < 6;
+
+        return (noGuards || lowGuards) && fewVillages;
       })
       .map(structure => {
         const realmsMap = new Map(realmsData.map(r => [r.id, r]));
         const realmDetail = realmsMap.get(structure['metadata.realm_id']);
         const realmName = realmDetail?.name;
-        if (!realmName) return null;
+
+        if (!realmName) return null; 
+
         const normalizedOwner = normalizeAddress(structure.owner);
         const username = normalizedOwner ? cartridgeUsernames.get(normalizedOwner) : undefined;
         const ownerDisplay = username || (structure.owner ? `${structure.owner.substring(0, 6)}...${structure.owner.substring(structure.owner.length - 4)}` : 'N/A');
+        
         const guardTroopsDisplay = parseTroopGuardsFromStructure(structure);
-        return {
+        const villagesCount = structure['metadata.villages_count'] || 0; 
+        const tribeInfo = normalizedOwner ? playerToTribeMap.get(normalizedOwner) : undefined;
+        const tribeName = tribeInfo?.guildName;
+        const tribeId = tribeInfo?.guildId; // Get tribeId for filtering
+
+        // Explicitly return type that matches DisplayableStructure or null
+        const displayableObj: Omit<DisplayableStructure, 'category' | 'coord_x' | 'coord_y'> & { entity_id: number, ownerTribeId?: string } = {
           entity_id: structure.entity_id,
           ownerDisplay: ownerDisplay,
           level: structure['base.level'],
@@ -325,39 +486,82 @@ const EternumStructuresPage = () => {
           availableTroops: realmDetail?.availableTroops || [],
           originalOwnerAddress: structure.owner,
           guardTroopsDisplay: guardTroopsDisplay,
+          villagesCount: villagesCount, 
+          tribeName: tribeName, 
+          ownerTribeId: tribeId, // Add owner's tribe ID to the mapped object
         };
+        return displayableObj as DisplayableStructure & { ownerTribeId?: string }; // Cast here after ensuring all required fields are present
       })
-      .filter((s): s is DisplayableStructure => s !== null);
+      .filter(s => s !== null); // Filter out nulls first
+
+    // Now, mappedStructures is an array of non-null DisplayableStructure objects (potentially empty)
+    // So, we can safely cast it for further operations if needed, or use directly.
+    let fullyProcessedStructures = mappedStructures as Array<DisplayableStructure & { ownerTribeId?: string }>;
+
     if (selectedOwnerFromURL) {
-      processedStructures = processedStructures.filter(
+      fullyProcessedStructures = fullyProcessedStructures.filter(
         s => normalizeAddress(s.originalOwnerAddress) === selectedOwnerFromURL
       );
     }
-    return processedStructures.sort((a, b) => a.entity_id - b.entity_id);
-  }, [structures, realmsData, cartridgeUsernames, loadingStructures, loadingRealms, loadingUsernames, selectedOwnerFromURL, guardFilter]);
+    
+    // ---- START APPLY TRIBE FILTER ----
+    if (selectedTribeIdFromURL) {
+      fullyProcessedStructures = fullyProcessedStructures.filter(
+        s => s.ownerTribeId === selectedTribeIdFromURL
+      );
+    }
+    // ---- END APPLY TRIBE FILTER ----
+    
+    return fullyProcessedStructures.sort((a, b) => {
+      // Sort by Tribe Name (treat 'N/A' or undefined as last)
+      const tribeA = a.tribeName || 'zzzz'; // Push N/A or undefined to the end
+      const tribeB = b.tribeName || 'zzzz';
+      if (tribeA.toLowerCase() < tribeB.toLowerCase()) return -1;
+      if (tribeA.toLowerCase() > tribeB.toLowerCase()) return 1;
+
+      // Then by Owner Display Name
+      if (a.ownerDisplay.toLowerCase() < b.ownerDisplay.toLowerCase()) return -1;
+      if (a.ownerDisplay.toLowerCase() > b.ownerDisplay.toLowerCase()) return 1;
+
+      // Finally by Entity ID
+      return a.entity_id - b.entity_id;
+    });
+  }, [
+    structures, 
+    realmsData, 
+    cartridgeUsernames, 
+    loadingStructures, 
+    loadingRealms, 
+    loadingUsernames, 
+    loadingTribes, 
+    selectedOwnerFromURL, 
+    selectedTribeIdFromURL, // Add selectedTribeIdFromURL to dependencies
+    guardFilter,
+    playerToTribeMap
+  ]);
 
   const handleExportToExcel = useCallback(() => {
     if (combinedAndFilteredStructures.length === 0) return;
-
-    // Define headers
     const headers = [
       'Entity ID',
       'Owner',
       'Owner Address',
       'Level',
       'Realm Name',
+      'Villages', // New Header
+      'Tribe',    // New Header
       'Resources',
       'Available Troops',
       'Guard Troops'
     ];
-
-    // Convert data to CSV rows
     const rows = combinedAndFilteredStructures.map(structure => [
       structure.entity_id,
       structure.ownerDisplay,
       structure.originalOwnerAddress,
       structure.level,
       structure.realmName,
+      structure.villagesCount, // New Data
+      structure.tribeName || 'N/A', // New Data
       structure.resources
         .filter(rDef => rDef.rarity !== 'troop')
         .map(rDef => rDef.name)
@@ -380,9 +584,9 @@ const EternumStructuresPage = () => {
     downloadCSV(csvContent, filename);
   }, [combinedAndFilteredStructures]);
 
-  const isLoading = loadingStructures || loadingRealms || loadingUsernames;
+  const isLoading = loadingStructures || loadingRealms || loadingUsernames || loadingTribes; // Add loadingTribes
 
-  if (isLoading && combinedAndFilteredStructures.length === 0) { // Show loading only if no data yet and still loading something
+  if (isLoading && combinedAndFilteredStructures.length === 0) {
     return <div className="eternum-structures-container loading-message"><p>Loading data...</p></div>;
   }
 
@@ -416,15 +620,19 @@ const EternumStructuresPage = () => {
             ))}
           </select>
         </div>
+
+        {/* ---- START TRIBE FILTER DROPDOWN ---- */}
         <div className="filter-item">
-          <button 
-            onClick={handleExportToExcel}
-            disabled={combinedAndFilteredStructures.length === 0}
-            className="export-button"
-          >
-            Export to Excel
-          </button>
+          <label htmlFor="tribe-filter">Filter by Tribe:</label>
+          <select id="tribe-filter" value={selectedTribeIdFromURL || ''} onChange={handleTribeFilterChange}>
+            <option value="">All Tribes</option>
+            {uniqueTribeOptions.map(option => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
         </div>
+        {/* ---- END TRIBE FILTER DROPDOWN ---- */}
+
         <div className="filter-item">
           <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <input
@@ -433,8 +641,18 @@ const EternumStructuresPage = () => {
               onChange={handleGuardFilterChange}
               style={{ marginRight: 6 }}
             />
-            Only realms with no guards or &lt; 500 total guard troops
+            Realms that can be spawn killed by villages
           </label>
+        </div>
+
+        <div className="filter-item">
+          <button 
+            onClick={handleExportToExcel}
+            disabled={combinedAndFilteredStructures.length === 0}
+            className="export-button"
+          >
+            Export to Excel
+          </button>
         </div>
       </div>
 
@@ -446,6 +664,8 @@ const EternumStructuresPage = () => {
               <th>Owner</th>
               <th>Level</th>
               <th>Realm Name</th>
+              <th>Villages</th>
+              <th>Tribe</th>
               <th>Resources</th>
               <th>Troops (Available)</th>
               <th>Guard Troops</th>
@@ -458,6 +678,8 @@ const EternumStructuresPage = () => {
                 <td className="col-owner" title={structure.originalOwnerAddress}>{structure.ownerDisplay}</td>
                 <td>{structure.level}</td>
                 <td className="col-realm-name">{structure.realmName}</td>
+                <td>{structure.villagesCount.toLocaleString()}</td>
+                <td>{structure.tribeName || 'N/A'}</td>
                 <td className="col-resources">
                   {structure.resources
                     .filter(rDef => rDef.rarity !== 'troop')
