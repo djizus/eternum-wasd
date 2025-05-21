@@ -46,6 +46,8 @@ interface SelectedHexData extends Partial<HexSpot> { // Most fields from HexSpot
   resourcesToDisplay?: ResourceDefinition[] | null; // Store resource objects for styling
   guardTroopsInfo?: string[] | null; // New: array of strings for multi-line display or null
   villagesCount?: number;   // New: For displaying village count
+  tribeId?: string; // New: For tribe information
+  tribeName?: string; // New: For tribe information
 }
 
 interface MapData {
@@ -153,6 +155,32 @@ function hslToHex(h: number, s: number, l: number): string {
   return rgbToHex(r, g, b);
 }
 
+// ---- START hexToAscii HELPER (copied from EternumStructuresPage) ----
+function hexToAscii(hexString: string): string {
+  if (!hexString || typeof hexString !== 'string') {
+    return "Unknown Name";
+  }
+  const cleanHexString = hexString.startsWith('0x') ? hexString.slice(2) : hexString;
+  // Ensure the string has an even length by prepending '0' if necessary
+  const finalHexString = cleanHexString.length % 2 !== 0 ? '0' + cleanHexString : cleanHexString;
+  let asciiString = '';
+  try {
+    for (let i = 0; i < finalHexString.length; i += 2) {
+      const charCode = parseInt(finalHexString.substring(i, i + 2), 16);
+      if (charCode > 0) { // Avoid null characters in the middle if not intended
+          asciiString += String.fromCharCode(charCode);
+      }
+    }
+    // Remove trailing null characters and trim whitespace
+    const trimmed = asciiString.replace(/\0+$/, '').trim();
+    return trimmed.length > 0 ? trimmed : "Unnamed Tribe";
+  } catch (e) {
+    console.error("Error converting hex to ASCII:", hexString, e);
+    return "Invalid Name"; // Or handle error as appropriate
+  }
+}
+// ---- END hexToAscii HELPER ----
+
 // --- Updated Helper Function for Village Density Color (Green-Yellow-Red) ---
 const VILLAGE_DENSITY_SATURATION_GYR = 90; // High saturation for vivid colors
 const VILLAGE_DENSITY_LIGHTNESS_GYR = 55;  // A balanced lightness
@@ -233,6 +261,23 @@ interface Member {
 // Type for the response from /api/cartridge-usernames
 type CartridgeUsernamesResponse = Record<string, string>;
 
+// ---- START TRIBE INTERFACES (copied from EternumStructuresPage) ----
+interface TribeMemberInfo { // From /api/tribes
+  guild_id: string;
+  member: string; // Player address
+  name: string;   // Hex-encoded guild name
+  member_count: number; // Add member_count
+  [key: string]: unknown; // Allow other fields
+}
+
+interface ProcessedGuildInfo {
+  id: string; // guild_id
+  name: string; // Decoded name
+  members: string[]; // Array of normalized member addresses
+  memberCount: number;
+}
+// ---- END TRIBE INTERFACES ----
+
 const LiveMapPage: React.FC = () => {
   const [mapData, setMapData] = useState<MapData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -258,10 +303,17 @@ const LiveMapPage: React.FC = () => {
   const [realmResourceData, setRealmResourceData] = useState<RealmResourceInfo[]>([]);
   const [loadingRealmResources, setLoadingRealmResources] = useState<boolean>(true);
   // --- New State for Layers ---
-  const [selectedLayer, setSelectedLayer] = useState<'guild' | 'resource' | 'village' | 'player'>('guild');
+  const [selectedLayer, setSelectedLayer] = useState<'guild' | 'resource' | 'village' | 'player' | 'tribe'>('guild');
   const [selectedResourceHighlight, setSelectedResourceHighlight] = useState<string | null>('Dragonhide'); // Default to Dragonhide
   const [selectedPlayerAddressHighlight, setSelectedPlayerAddressHighlight] = useState<string | null>(null); // For Player Search layer
+  // Tribe layer state
+  const [selectedTribeId, setSelectedTribeId] = useState<string | null>(null);
   // ---------------------------
+
+  // ---- START TRIBE STATE ----
+  const [processedGuilds, setProcessedGuilds] = useState<Map<string, ProcessedGuildInfo>>(new Map());
+  const [loadingTribes, setLoadingTribes] = useState<boolean>(true);
+  // ---- END TRIBE STATE ----
 
   // Ref for the SVG element
   const svgRef = useRef<SVGSVGElement>(null);
@@ -359,6 +411,22 @@ const LiveMapPage: React.FC = () => {
   }, [guildMembers, cartridgeUsernames]);
   // --- End Final Combined Map ---
 
+  // ---- START playerToTribeMap (similar to EternumStructuresPage) ----
+  const playerToTribeMap = useMemo(() => {
+    const map = new Map<string, { guildId: string, guildName: string }>();
+    if (processedGuilds.size === 0) return map;
+    processedGuilds.forEach(guild => {
+      guild.members.forEach(memberAddress => {
+        map.set(memberAddress, { 
+          guildId: guild.id, 
+          guildName: guild.name, 
+        });
+      });
+    });
+    return map;
+  }, [processedGuilds]);
+  // ---- END playerToTribeMap ----
+
   // --- New: Memoized list of unique players for dropdown ---
   const uniquePlayersForDropdown = useMemo(() => {
     if (realmStructuresData.length === 0) return [];
@@ -409,6 +477,14 @@ const LiveMapPage: React.FC = () => {
           } else {
             fillColor = OCCUPIED_FILL_COLOR; // Non-guild member occupied color
           }
+        } else if (selectedLayer === 'tribe' && selectedTribeId) {
+          // Tribe layer: Highlight if the owner is in the selected tribe
+          const tribeInfo = playerToTribeMap.get(normalizedOwnerAddress || '');
+          if (tribeInfo && tribeInfo.guildId === selectedTribeId) {
+            fillColor = '#e67e22'; // Orange highlight for selected tribe
+          } else {
+            fillColor = DEFAULT_FILL_COLOR;
+          }
         } else if (selectedLayer === 'resource' && selectedResourceHighlight) {
           // Resource layer: Check if the realm produces the highlighted resource
           const realmInfoFromResourcesApi = realmResourceMap.get(realmStructure.metadata_realm_id);
@@ -458,7 +534,7 @@ const LiveMapPage: React.FC = () => {
       }
     }
     return renderData;
-  }, [mapData, realmStructuresData, potentialSpotsMap, memberToColorMap, selectedLayer, selectedResourceHighlight, realmResourceMap, maxVillageCountForRealms, selectedPlayerAddressHighlight]); // Added selectedPlayerAddressHighlight
+  }, [mapData, realmStructuresData, potentialSpotsMap, memberToColorMap, selectedLayer, selectedResourceHighlight, realmResourceMap, maxVillageCountForRealms, selectedPlayerAddressHighlight, selectedTribeId, playerToTribeMap]); // Added selectedPlayerAddressHighlight and selectedTribeId
 
   // MODIFIED: Member Legend now uses realmStructuresData
   const coloredMembersForLegend = useMemo(() => {
@@ -494,18 +570,20 @@ const LiveMapPage: React.FC = () => {
     setLoadingStructuresData(true); 
     setLoadingRealmResources(true); 
     setLoadingCartridgeUsernames(true); // Initialize loading for Cartridge usernames
+    setLoadingTribes(true);
     setError(null); // Clear previous errors on new fetch
 
     let allOwnerAddresses: string[] = []; // To store addresses for Cartridge API call
     let currentMapData: MapData | null = null; // To hold map data for processing
 
     try {
-      // Fetch map data, member data, RealmStructureData, and RealmResources in parallel
-      const [mapResponse, memberResponse, structuresResponse, realmResourceResponse] = await Promise.all([
+      // Fetch map data, member data, RealmStructureData, RealmResources, and Tribe Data in parallel
+      const [mapResponse, memberResponse, structuresResponse, realmResourceResponse, tribesResponse] = await Promise.all([
         fetch('/eternum_all_locations.json'),
         fetch('/api/members'),
         fetch('/api/eternum-structures'), // MODIFIED: Use the new API route
-        fetch("/api/realms") // Fetch realm resource data
+        fetch("/api/realms"), // Fetch realm resource data
+        fetch("/api/tribes") // Fetch tribe data
       ]);
 
       // Process Map Data (comes first as structures might augment it)
@@ -600,6 +678,37 @@ const LiveMapPage: React.FC = () => {
         }
       }
 
+      // ---- START PROCESS TRIBES DATA ----
+      if (!tribesResponse.ok) {
+        console.error('Failed to fetch tribes data:', tribesResponse.statusText);
+        setProcessedGuilds(new Map()); // Set to empty map on error
+      } else {
+        const tribesJsonData: TribeMemberInfo[] = await tribesResponse.json();
+        const guilds = new Map<string, ProcessedGuildInfo>();
+        tribesJsonData.forEach(memberInfo => {
+          const normalizedMemberAddr = normalizeAddress(memberInfo.member);
+          if (!normalizedMemberAddr) return; 
+
+          if (!guilds.has(memberInfo.guild_id)) {
+            guilds.set(memberInfo.guild_id, {
+              id: memberInfo.guild_id,
+              name: hexToAscii(memberInfo.name), // Decode hex name
+              members: [],
+              memberCount: memberInfo.member_count || 0,
+            });
+          }
+          const guild = guilds.get(memberInfo.guild_id)!;
+          if (!guild.members.includes(normalizedMemberAddr)) {
+            guild.members.push(normalizedMemberAddr);
+          }
+          // Ensure memberCount is the highest reported for the guild
+          guild.memberCount = Math.max(guild.memberCount, memberInfo.member_count || 0); 
+        });
+        setProcessedGuilds(guilds);
+        console.log(`[liveMapPage] Processed ${guilds.size} tribes/guilds.`);
+      }
+      // ---- END PROCESS TRIBES DATA ----
+
       // --- Fetch Cartridge Usernames for all collected owner addresses ---
       if (allOwnerAddresses.length > 0) {
         console.log(`[liveMapPage] Fetching Cartridge usernames for ${allOwnerAddresses.length} addresses...`);
@@ -648,6 +757,7 @@ const LiveMapPage: React.FC = () => {
       setLoadingStructuresData(false); 
       setLoadingRealmResources(false); 
       setLoadingCartridgeUsernames(false); // Set loading to false for Cartridge usernames
+      setLoadingTribes(false); // Set loading to false for tribes
       console.log("[liveMapPage] Finished fetching map data."); // Log end of fetch
     }
   };
@@ -804,6 +914,7 @@ const LiveMapPage: React.FC = () => {
     let normalizedX: number, normalizedY: number;
     let contractX: number | undefined, contractY: number | undefined;
     let ownerAddressFromData: string | undefined;
+    let ownerTribeInfo: { guildId: string, guildName: string } | undefined = undefined; // New variable for tribe info
 
     if (type === 'Occupied Spot') {
       // For Occupied Spot, hexData is a merged object of potentialSpot & realmStructure
@@ -816,6 +927,7 @@ const LiveMapPage: React.FC = () => {
       contractX = currentRealmStructure.x; 
       contractY = currentRealmStructure.y; 
       ownerAddressFromData = currentRealmStructure.owner_address;
+      // ownerTribeInfo will be set later after normalizedOwnerAddress is defined
 
     } else if ('normalizedX' in hexData && 'normalizedY' in hexData) { // Potential Spot or Bank
       currentPotentialSpotInfo = hexData as HexSpot;
@@ -838,6 +950,11 @@ const LiveMapPage: React.FC = () => {
     }
 
     const normalizedOwnerAddress = normalizeAddress(ownerAddressFromData);
+
+    // Now that normalizedOwnerAddress is defined, get tribe info if it's an occupied spot
+    if (type === 'Occupied Spot' && normalizedOwnerAddress) {
+      ownerTribeInfo = playerToTribeMap.get(normalizedOwnerAddress);
+    }
 
     const realmStructureToUse = currentRealmStructure; 
 
@@ -940,6 +1057,9 @@ const LiveMapPage: React.FC = () => {
       resourcesToDisplay: finalResourcesToDisplay, // Store the array of objects
       guardTroopsInfo: guardTroopsDisplay,
       villagesCount: villagesDisplayCount,
+      // Add tribe info to the state
+      tribeId: ownerTribeInfo?.guildId,
+      tribeName: ownerTribeInfo?.guildName,
     };
     setSelectedHex(dataForState);
   };
@@ -987,7 +1107,7 @@ const LiveMapPage: React.FC = () => {
   }
   // --- End Troop Guard Parsing Function ---
 
-  if (loading || loadingMembers || loadingStructuresData || loadingRealmResources || loadingCartridgeUsernames) { // Update loading check
+  if (loading || loadingMembers || loadingStructuresData || loadingRealmResources || loadingCartridgeUsernames || loadingTribes) { // Update loading check
     return <div className="map-loading">Loading Map Data...</div>;
   }
 
@@ -1023,6 +1143,13 @@ const LiveMapPage: React.FC = () => {
                     <span className="info-label">Owner:</span>
                     <span className="info-value">{selectedHex.ownerName}</span>
                   </div>
+                  {/* New: Display Tribe Name if available - MOVED HERE */}
+                  {selectedHex.tribeName && (
+                    <div className="info-line">
+                      <span className="info-label">Tribe:</span>
+                      <span className="info-value">{selectedHex.tribeName}</span>
+                    </div>
+                  )}
                   {selectedHex.villagesCount !== undefined && (
                     <div className="info-line">
                       <span className="info-label">Villages:</span>
@@ -1246,6 +1373,15 @@ const LiveMapPage: React.FC = () => {
                 /> Member Colors
               </label>
               <label>
+                <input
+                  type="radio"
+                  name="layer"
+                  value="tribe"
+                  checked={selectedLayer === 'tribe'}
+                  onChange={() => setSelectedLayer('tribe')}
+                /> Tribe
+              </label>
+              <label>
                 <input 
                   type="radio" 
                   name="layer" 
@@ -1317,6 +1453,26 @@ const LiveMapPage: React.FC = () => {
               </select>
             </div>
           )}
+
+          {/* Tribe Selection Dropdown (Conditional) */}
+          {selectedLayer === 'tribe' && (
+            <div className="control-group">
+              <label htmlFor="tribeSelect" className="control-label">Highlight Tribe:</label>
+              <select
+                id="tribeSelect"
+                value={selectedTribeId || ''}
+                onChange={e => setSelectedTribeId(e.target.value || null)}
+                className="control-select"
+              >
+                <option value="">-- Select Tribe --</option>
+                {Array.from(processedGuilds.values())
+                  .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()))
+                  .map(guild => (
+                    <option key={guild.id} value={guild.id}>{guild.name} ({guild.memberCount})</option>
+                  ))}
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Member Color Legend (Conditionally Rendered) */}
@@ -1334,6 +1490,15 @@ const LiveMapPage: React.FC = () => {
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {/* Tribe Legend (Conditionally Rendered) */}
+        {selectedLayer === 'tribe' && selectedTribeId && processedGuilds.has(selectedTribeId) && (
+          <div className="legend-section tribe-legend">
+            <h5 className="legend-title">Tribe Info</h5>
+            <div><b>Name:</b> {processedGuilds.get(selectedTribeId)?.name}</div>
+            <div><b>Members:</b> {processedGuilds.get(selectedTribeId)?.memberCount}</div>
           </div>
         )}
 
